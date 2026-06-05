@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OmniDesk</title>
+    <meta name="theme-color" content="#6b38d4" />
+    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <link rel="icon" href="/static/omnidesk-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/static/omnidesk-icon.svg" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+    <script src="/static/app.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed-dim": "#bdc7d9",
+              "on-error-container": "#93000a",
+              "secondary-fixed": "#d9e3f6",
+              "on-secondary-fixed-variant": "#3d4756",
+              "surface-container": "#e7eefe",
+              primary: "#6b38d4",
+              "tertiary-fixed-dim": "#ffb869",
+              "inverse-surface": "#2a313d",
+              "surface-container-low": "#f0f3ff",
+              "on-tertiary": "#ffffff",
+              "on-surface": "#151c27",
+              "on-primary-container": "#fffbff",
+              background: "#f9f9ff",
+              "on-primary-fixed-variant": "#5516be",
+              "primary-fixed": "#e9ddff",
+              "surface-container-high": "#e2e8f8",
+              error: "#ba1a1a",
+              "on-tertiary-fixed-variant": "#673d00",
+              tertiary: "#855000",
+              "primary-container": "#8455ef",
+              "on-secondary-container": "#596373",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-highest": "#dce2f3",
+              surface: "#f9f9ff",
+              "on-background": "#151c27",
+              outline: "#7b7486",
+              "inverse-primary": "#d0bcff",
+              "surface-bright": "#f9f9ff",
+              "on-tertiary-fixed": "#2c1700",
+              "inverse-on-surface": "#ebf1ff",
+              "tertiary-container": "#a76500",
+              "on-error": "#ffffff",
+              "on-secondary": "#ffffff",
+              "on-surface-variant": "#494454",
+              "surface-variant": "#dce2f3",
+              "secondary-container": "#d6e0f3",
+              secondary: "#555f6f",
+              "outline-variant": "#cbc3d7",
+              "on-secondary-fixed": "#121c2a",
+              "surface-tint": "#6d3bd7",
+              "on-primary-fixed": "#23005c",
+              "on-primary": "#ffffff",
+              "primary-fixed-dim": "#d0bcff",
+              "surface-dim": "#d3daea",
+              "error-container": "#ffdad6",
+              "tertiary-fixed": "#ffdcbb",
+              "on-tertiary-container": "#fffbff",
+            },
+            borderRadius: {
+              DEFAULT: "0.25rem",
+              lg: "0.5rem",
+              xl: "0.75rem",
+              full: "9999px",
+            },
+            spacing: {
+              gutter: "1rem",
+              "stack-md": "1rem",
+              "inbox-list-width": "320px",
+              "sidebar-width": "260px",
+              "stack-lg": "1.5rem",
+              "container-padding": "2rem",
+              "stack-sm": "0.5rem",
+            },
+            fontFamily: {
+              "headline-sm": ["Inter"],
+              "body-sm": ["Inter"],
+              "body-lg": ["Inter"],
+              "body-md": ["Inter"],
+              "display-lg": ["Inter"],
+              "headline-md": ["Inter"],
+              "label-md": ["Inter"],
+              "label-sm": ["Inter"],
+            },
+            fontSize: {
+              "headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+              "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+              "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+              "display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+              "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+              "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
+              "label-sm": ["11px", { lineHeight: "14px", fontWeight: "500" }],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="bg-background text-on-background min-h-screen">
+    <div id="app" v-cloak>
+      <aside
+        v-if="!sidebarHidden && !(isMobileLayout && activeChatId !== null)"
+        class="fixed left-0 top-0 h-screen bg-inverse-surface text-secondary-fixed-dim z-50 flex flex-col transition-[width] duration-200"
+        :class="[sidebarCollapsed ? 'p-3' : 'p-4', sidebarDragging ? 'transition-none' : '']"
+        :style="sidebarStyle"
+      >
+        <div class="mb-8 py-2" :class="sidebarCollapsed ? 'px-0 text-center' : 'px-4'">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0" :class="sidebarCollapsed ? 'w-full' : ''">
+              <h1 class="font-headline-md text-headline-md font-bold text-white tracking-tight truncate">{{ sidebarCollapsed ? 'OD' : 'OmniDesk' }}</h1>
+              <p v-if="!sidebarCollapsed" class="font-label-md text-label-md opacity-60">Customer Support</p>
+            </div>
+            <div v-if="!sidebarCollapsed" class="flex items-center gap-1">
+              <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-full text-secondary-fixed-dim hover:bg-white/10 hover:text-white" title="Collapse sidebar" @click="toggleSidebarCollapsed">
+                <span class="material-symbols-outlined text-base">left_panel_close</span>
+              </button>
+              <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-full text-secondary-fixed-dim hover:bg-white/10 hover:text-white" title="Hide sidebar" @click="hideSidebar">
+                <span class="material-symbols-outlined text-base">keyboard_double_arrow_left</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <nav class="flex-1 space-y-1 sidebar-scroll overflow-y-auto">
+          <a
+            v-for="item in sidebarItems"
+            :key="item.label"
+            class="relative flex items-center rounded-lg transition-colors duration-200"
+            :class="sidebarItemClass(item)"
+            href="#"
+            :aria-disabled="item.unavailable ? 'true' : 'false'"
+            :title="sidebarCollapsed ? `${item.label}${item.unavailable ? ' (Unavailable)' : ''}` : item.unavailable ? `${item.label} is not available yet` : ''"
+            @click.prevent="handleSidebarItemClick(item)"
+          >
+            <span class="flex min-w-0 items-center" :class="sidebarCollapsed ? 'h-11 w-full justify-center' : 'gap-3 px-4 py-3 flex-1'">
+              <span class="material-symbols-outlined text-xl">{{ item.icon }}</span>
+              <span v-if="!sidebarCollapsed" class="font-label-md text-label-md truncate">{{ item.label }}</span>
+            </span>
+            <span
+              v-if="item.unavailable && !sidebarCollapsed"
+              class="mr-3 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-fixed-dim"
+            >
+              Soon
+            </span>
+            <span
+              v-if="item.view === 'conversations' && unreadChatCount"
+              class="inline-flex min-w-6 h-6 items-center justify-center rounded-full bg-white text-primary font-label-sm text-label-sm px-2"
+              :class="sidebarCollapsed ? 'absolute right-1 mt-1' : 'mr-3'"
+            >
+              {{ unreadChatCount }}
+            </span>
+          </a>
+        </nav>
+
+        <button v-if="sidebarCollapsed" type="button" class="mb-3 inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 text-secondary-fixed-dim hover:bg-white/10 hover:text-white" title="Expand sidebar" @click="toggleSidebarCollapsed">
+          <span class="material-symbols-outlined text-base">left_panel_open</span>
+        </button>
+
+        <div class="mt-auto pt-4 border-t border-white/10 flex items-center gap-3" :class="sidebarCollapsed ? 'justify-center px-0' : 'px-4'">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-tertiary-container grid place-items-center text-sm font-bold text-white shadow-sm">
+            {{ adminInitials }}
+          </div>
+          <div v-if="!sidebarCollapsed" class="flex flex-col min-w-0">
+            <span class="font-label-md text-label-md text-white truncate">{{ adminDisplayName }}</span>
+            <span class="text-[10px] uppercase tracking-wider text-secondary-fixed-dim truncate">{{ adminRoleLabel }}</span>
+          </div>
+        </div>
+
+        <div
+          class="absolute right-0 top-0 h-full w-2 cursor-col-resize bg-transparent group z-20"
+          title="Drag to resize sidebar"
+          @pointerdown="startSidebarResize"
+        >
+          <div
+            class="absolute right-0 top-0 h-full w-px bg-transparent transition-colors group-hover:bg-white/25"
+            :class="sidebarDragging ? 'bg-primary/70' : ''"
+          ></div>
+        </div>
+      </aside>
+
+
+      <main :class="mobileShowMessages ? 'p-1 min-h-screen' : 'pt-4 px-8 pb-6 min-h-screen transition-[margin-left] duration-200'" :style="mobileShowMessages ? {} : mainShellStyle">
+        <div v-if="isAccountsView" class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="font-display-lg text-display-lg text-on-surface">Platform Accounts</h2>
+            <p class="font-body-md text-body-md text-on-surface-variant mt-1">Manage your omnichannel connections and synchronization settings.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button class="bg-surface-container-low hover:bg-surface-container-high text-on-surface px-6 py-2.5 rounded-lg flex items-center gap-2 font-label-md text-label-md transition-all shadow-sm active:scale-95 border border-outline-variant" @click="setView('conversations')">
+              <span class="material-symbols-outlined">forum</span>
+              Open Conversations
+            </button>
+            <button class="bg-primary hover:bg-primary-container text-white px-6 py-2.5 rounded-lg flex items-center gap-2 font-label-md text-label-md transition-all shadow-sm active:scale-95" @click="focusCreateCard">
+              <span class="material-symbols-outlined">add</span>
+              Add New Platform
+            </button>
+          </div>
+        </div>
+
+        <div v-if="isAccountsView" class="flex items-center gap-4 mb-8 border-b border-outline-variant overflow-x-auto">
+          <button
+            v-for="tab in platformTabs"
+            :key="tab.key"
+            class="px-4 py-3 font-label-md text-label-md whitespace-nowrap"
+            :class="platformFilter === tab.key ? 'border-b-2 border-primary text-primary font-bold' : 'text-on-surface-variant hover:text-on-surface'"
+            @click="selectPlatform(tab.key)"
+          >
+            {{ tab.label }} ({{ tab.key === 'all' ? accounts.length : platformCount(tab.key) }})
+          </button>
+        </div>
+
+        <div v-if="isAccountsView" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div
+            v-for="account in filteredAccounts"
+            :key="account.id"
+            class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 hover:shadow-lg transition-shadow group relative overflow-hidden cursor-pointer"
+            :class="activeAccountId === account.id ? 'ring-2 ring-primary/35' : ''"
+            @click="selectAccount(account.id)"
+          >
+            <div class="absolute top-0 right-0 w-16 h-16 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" :class="accentBlobClass(account.platform)"></div>
+            <div class="flex items-start justify-between mb-6">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center text-white" :class="platformIconClass(account.platform)">
+                <span class="w-6 h-6" v-html="platformIcon(account.platform)"></span>
+              </div>
+              <span class="px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1.5" :class="statusPillClass(account)">
+                <span class="w-2 h-2 rounded-full" :class="statusDotClass(account)"></span>
+                {{ statusLabel(account) }}
+              </span>
+            </div>
+
+            <div class="mb-6">
+              <h3 class="font-headline-sm text-headline-sm text-on-surface">{{ account.display_name }}</h3>
+              <p class="font-label-md text-label-md text-on-surface-variant">{{ account.handle || account.phone || account.platform }}</p>
+            </div>
+
+            <div class="flex items-center gap-2 text-on-surface-variant mb-6 pb-6 border-b border-outline-variant/30">
+              <span class="material-symbols-outlined text-sm">sync</span>
+              <span class="font-body-sm text-body-sm">Last synced: {{ lastSyncedText(account) }}</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button class="flex items-center justify-center gap-2 px-4 py-2 border border-primary text-primary font-label-md text-label-md rounded-lg hover:bg-primary/5 transition-colors" @click.stop="openChat(account.id)">
+                <span class="material-symbols-outlined text-sm">forum</span>
+                Chat
+              </button>
+              <button class="flex-1 px-4 py-2 border border-outline text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-low transition-colors" @click.stop="toggleConnection(account.id)">
+                {{ connectionAction(account) }}
+              </button>
+              <button class="p-2 border border-outline text-on-surface-variant rounded-lg hover:bg-surface-container-low" @click.stop="openEditModal(account)">
+                <span class="material-symbols-outlined">settings</span>
+              </button>
+              <button class="p-2 border border-error/30 text-error rounded-lg hover:bg-error/10 transition-colors" @click.stop="confirmDeleteAccount(account)" title="Remove account">
+                <span class="material-symbols-outlined">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="isAccountsView" class="mt-12 bg-primary-container/10 border border-primary-container/20 rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8">
+          <div class="flex-1">
+            <h4 class="font-headline-sm text-headline-sm text-primary mb-2">Need a Custom Integration?</h4>
+            <p class="font-body-md text-body-md text-on-surface-variant">Our Developer API allows you to connect proprietary systems directly to the OmniDesk Unified Inbox. Explore our documentation to build custom connectors for your unique stack.</p>
+            <div class="mt-6 flex gap-4">
+              <a class="text-primary font-bold font-label-md text-label-md flex items-center gap-1 hover:underline" href="#">
+                Developer Docs <span class="material-symbols-outlined text-sm">open_in_new</span>
+              </a>
+              <a class="text-primary font-bold font-label-md text-label-md flex items-center gap-1 hover:underline" href="#">
+                API Reference <span class="material-symbols-outlined text-sm">arrow_forward</span>
+              </a>
+            </div>
+          </div>
+          <div class="w-full md:w-64 h-40 bg-surface rounded-xl border border-outline-variant overflow-hidden shadow-inner flex items-center justify-center p-4">
+            <div class="grid grid-cols-4 gap-2 opacity-30 grayscale pointer-events-none text-on-surface-variant">
+              <span class="material-symbols-outlined text-4xl">integration_instructions</span>
+              <span class="material-symbols-outlined text-4xl">terminal</span>
+              <span class="material-symbols-outlined text-4xl">data_object</span>
+              <span class="material-symbols-outlined text-4xl">webhook</span>
+              <span class="material-symbols-outlined text-4xl">api</span>
+              <span class="material-symbols-outlined text-4xl">settings_input_component</span>
+              <span class="material-symbols-outlined text-4xl">developer_board</span>
+              <span class="material-symbols-outlined text-4xl">memory</span>
+            </div>
+          </div>
+        </div>
+
+
+        <section v-if="isConversationsView" ref="inboxSection" class="bg-surface-container-lowest border border-outline-variant overflow-hidden shadow-sm flex flex-col" :class="mobileShowMessages ? 'rounded-xl h-[calc(100vh-0.5rem)]' : (isMobileLayout || isNarrowChat) ? 'rounded-xl h-[calc(100vh-3rem)]' : 'rounded-2xl h-[calc(100vh-3.5rem)]'">
+          <div v-show="!(isMobileLayout || isNarrowChat)" class="px-4 py-3 border-b border-outline-variant flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between shrink-0">
+            <div>
+              <p class="font-label-md text-label-md uppercase tracking-wider text-primary">Customer Inbox</p>
+              <h3 class="font-headline-md text-headline-md text-on-surface mt-1">Conversations</h3>
+              <p v-if="!isNarrowChat && !isMobileLayout" class="font-body-sm text-body-sm text-on-surface-variant mt-1">Chat first. Controls stay compact.</p>
+            </div>
+            <div v-if="!isNarrowChat && !isMobileLayout" class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-label-md font-label-md text-on-surface-variant hover:border-primary hover:text-primary"
+                title="Recalculate layout for the current window size"
+                @click="fitLayoutToViewport"
+              >
+                <span class="material-symbols-outlined text-base">fit_screen</span>
+                Fit to screen
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-label-md font-label-md text-on-surface-variant hover:border-primary hover:text-primary"
+                title="Reset sidebar and chat list size"
+                @click="resetLayout"
+              >
+                <span class="material-symbols-outlined text-base">restart_alt</span>
+                Reset layout
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_220px] flex-1 min-h-0" :style="conversationGridStyle">
+            <aside v-show="!mobileShowMessages" class="relative border-b xl:border-b-0 xl:border-r border-outline-variant bg-surface-container-low/60 overflow-hidden" :class="chatListCompact ? 'p-2' : 'p-3'">
+              <div class="flex items-center mb-3" :class="chatListCompact ? 'justify-center' : 'justify-between'">
+                <div v-if="!chatListCompact">
+                  <h4 class="font-headline-sm text-headline-sm text-on-surface">Chats</h4>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">{{ chats.length }} conversation(s)</p>
+                </div>
+                <button v-else type="button" class="p-2 rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-primary hover:border-primary" title="Expand chat list" @click="expandChatList">
+                  <span class="material-symbols-outlined text-lg">keyboard_double_arrow_right</span>
+                </button>
+                <button v-if="!chatListCompact" class="p-2 rounded-full hover:bg-surface-container-low transition-colors" title="Refresh chats" @click="refreshInbox">
+                  <span class="material-symbols-outlined text-lg">refresh</span>
+                </button>
+              </div>
+
+              <div v-if="!chatListCompact" class="mb-4">
+                <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Account</label>
+                <div class="relative">
+                  <select
+                    :value="activeAccountId || ''"
+                    class="w-full rounded-xl border border-outline-variant bg-surface-container-lowest py-3 pl-4 pr-11 text-body-md appearance-none truncate"
+                    @change="selectAccount($event.target.value)"
+                  >
+                    <option value="all">All accounts</option>
+                    <option v-for="account in accounts" :key="account.id" :value="account.id">
+                      {{ account.display_name }} &middot; {{ formatPlatform(account.platform) }}
+                    </option>
+                  </select>
+                  <span class="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-base text-on-surface-variant">expand_more</span>
+                </div>
+              </div>
+
+              <div class="max-h-[calc(100vh-19rem)] overflow-y-auto" :class="chatListCompact ? 'space-y-2 pr-0' : 'space-y-3 pr-1'">
+                <button
+                  v-for="chat in chats"
+                  :key="chat.id"
+                  class="relative w-full text-left rounded-xl border transition-all"
+                  :class="[
+                    activeChatId === chat.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low',
+                    chatListCompact ? 'px-2 py-2' : 'px-3 py-3'
+                  ]"
+                  :title="`${chat.title}${chatProfileSubtitle(chat) ? ' - ' + chatProfileSubtitle(chat) : ''}`"
+                  @click="selectChat(chat.id)"
+                >
+                  <div class="flex items-center gap-3" :class="chatListCompact ? 'justify-center' : ''">
+                    <div class="relative h-11 w-11 shrink-0">
+                      <img
+                        v-if="chatAvatarUrl(chat)"
+                        :src="chatAvatarUrl(chat)"
+                        :alt="`${chat.title} profile photo`"
+                        class="h-11 w-11 rounded-full object-cover border border-outline-variant bg-surface-container-low"
+                        @error="markChatAvatarMissing(chat)"
+                      />
+                      <div
+                        v-else
+                        class="h-11 w-11 rounded-full bg-primary/10 text-primary grid place-items-center font-label-lg text-label-lg border border-primary/10"
+                      >
+                        {{ chatInitials(chat) }}
+                      </div>
+                      <span class="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full grid place-items-center text-white ring-2 ring-surface-container-lowest" :class="platformIconClass(chatPlatform(chat))">
+                        <span class="w-2.5 h-2.5" v-html="platformIcon(chatPlatform(chat))"></span>
+                      </span>
+                    </div>
+                    <div v-if="!chatListCompact" class="min-w-0 flex-1">
+                      <p class="font-label-md text-label-md text-on-surface truncate">{{ chat.title }}</p>
+                      <p class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ chatProfileSubtitle(chat) }}</p>
+                      <p v-if="isAllAccountsMode" class="mt-1 inline-flex max-w-full rounded-md bg-surface-container-high px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant truncate">
+                        {{ chatAccountLabel(chat) }}
+                      </p>
+                    </div>
+                    <div v-if="!chatListCompact" class="text-right shrink-0 flex flex-col items-end gap-1">
+                      <span
+                        v-if="chat.unread_count"
+                        class="inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full bg-error text-white font-label-sm text-label-sm"
+                        :title="`${chat.unread_count} unread message(s)`"
+                      >
+                        {{ chat.unread_count }}
+                      </span>
+                      <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">{{ formatRelativeTime(chat.last_message_at) }}</p>
+                    </div>
+                  </div>
+                  <span
+                    v-if="chatListCompact && chat.unread_count"
+                    class="absolute right-1 top-1 inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold leading-none text-white"
+                    :title="`${chat.unread_count} unread message(s)`"
+                  >
+                    {{ chat.unread_count }}
+                  </span>
+                </button>
+
+                <div v-if="inboxLoading" class="p-6 text-center text-on-surface-variant flex flex-col items-center justify-center gap-2">
+                  <svg class="animate-spin h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span class="text-body-sm font-medium">Loading chats...</span>
+                </div>
+                <div v-else-if="!chats.length" class="rounded-xl border border-dashed border-outline-variant p-4 text-center text-on-surface-variant bg-surface-container-lowest">
+                  <template v-if="canSyncTelegram(activeAccount)">
+                    No Telegram chats synced yet. Click <b>Sync Telegram</b>, <b>Restore archived + old chats</b>, or refresh the thread.
+                  </template>
+                  <template v-else-if="isAllAccountsMode">
+                    No conversations found across all accounts yet.
+                  </template>
+                  <template v-else>
+                    Select an account above to load its conversations.
+                  </template>
+                </div>
+              </div>
+
+              <div
+                class="hidden xl:block absolute right-0 top-0 h-full w-2 cursor-col-resize bg-transparent group z-20"
+                title="Drag to resize chat list"
+                @pointerdown="startChatListResize"
+              >
+                <div
+                  class="absolute right-0 top-0 h-full w-px bg-transparent transition-colors group-hover:bg-outline/40"
+                  :class="chatListDragging ? 'bg-primary/70' : ''"
+                ></div>
+              </div>
+            </aside>
+
+            <section v-show="!isMobileLayout && !isNarrowChat || mobileShowMessages" :class="mobileShowMessages ? 'p-2' : 'p-3 lg:p-4'" class="flex flex-col min-h-0">
+              <div class="flex items-center justify-between gap-2 mb-2 shrink-0">
+                <div class="flex items-center gap-3 min-w-0">
+                  <button
+                    v-if="(isMobileLayout || isNarrowChat) && activeChatId"
+                    type="button"
+                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors"
+                    title="Back to chat list"
+                    @click="backToChats"
+                  >
+                    <span class="material-symbols-outlined text-lg">arrow_back</span>
+                  </button>
+                  <div v-if="activeChat" class="relative shrink-0" :class="mobileShowMessages ? 'h-9 w-9' : 'h-12 w-12'">
+                    <img
+                      v-if="chatAvatarUrl(activeChat)"
+                      :src="chatAvatarUrl(activeChat)"
+                      :alt="`${activeChat.title} profile photo`"
+                      class="rounded-full object-cover border border-outline-variant bg-surface-container-low"
+                      :class="mobileShowMessages ? 'h-9 w-9' : 'h-12 w-12'"
+                      @error="markChatAvatarMissing(activeChat)"
+                    />
+                    <div
+                      v-else
+                      class="rounded-full bg-primary/10 text-primary grid place-items-center font-label-lg text-label-lg border border-primary/10"
+                      :class="mobileShowMessages ? 'h-9 w-9 text-sm' : 'h-12 w-12'"
+                    >
+                      {{ chatInitials(activeChat) }}
+                    </div>
+                    <span class="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full grid place-items-center text-white ring-2 ring-surface-container-lowest" :class="platformIconClass(chatPlatform(activeChat))">
+                      <span class="w-2.5 h-2.5" v-html="platformIcon(chatPlatform(activeChat))"></span>
+                    </span>
+                  </div>
+                  <div class="min-w-0">
+                    <p v-if="!mobileShowMessages" class="font-label-md text-label-md text-primary uppercase tracking-wider">Conversation</p>
+                    <div class="flex min-w-0 items-center gap-1" :class="mobileShowMessages ? '' : 'mt-1'">
+                      <h4 class="text-on-surface truncate" :class="mobileShowMessages ? 'text-sm font-semibold' : 'font-headline-sm text-headline-sm'">{{ inboxTitle }}</h4>
+                      <button
+                        v-if="activeChat && !mobileShowMessages"
+                        type="button"
+                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+                        title="Rename customer"
+                        @click="openRenameChatDialog(activeChat)"
+                      >
+                        <span class="material-symbols-outlined text-base">edit</span>
+                      </button>
+                    </div>
+                    <p v-if="!mobileShowMessages" class="font-body-sm text-body-sm text-on-surface-variant mt-1 truncate">
+                      {{ conversationAccount ? formatPlatform(conversationAccount.platform) : 'All accounts' }}
+                      <span v-if="activeChat"> &middot; {{ chatProfileSubtitle(activeChat) }}</span>
+                      <span v-if="activeChat && isAllAccountsMode"> &middot; {{ chatAccountLabel(activeChat) }}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1">
+                  <template v-if="!mobileShowMessages">
+                    <button
+                      v-if="canSyncTelegram(conversationAccount)"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-full text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                      :disabled="syncLoading"
+                      @click="startTelegramSync(conversationAccount.id)"
+                      :title="syncLoading ? 'Syncing...' : 'Sync Telegram'"
+                    >
+                      <span class="material-symbols-outlined text-lg" :class="syncLoading ? 'animate-spin' : ''">sync</span>
+                    </button>
+                    <button
+                      v-if="canSyncTelegram(conversationAccount)"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors disabled:opacity-50"
+                      :disabled="syncLoading || restoreLoading"
+                      @click="restoreTelegramAccount(conversationAccount.id)"
+                      :title="restoreLoading ? 'Restoring...' : 'Restore archived + old chats'"
+                    >
+                      <span class="material-symbols-outlined text-lg" :class="restoreLoading ? 'animate-spin' : ''">history</span>
+                    </button>
+                    <button
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+                      @click="refreshInbox"
+                      title="Refresh thread"
+                    >
+                      <span class="material-symbols-outlined text-lg">refresh</span>
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button
+                      v-if="canSyncTelegram(conversationAccount)"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-full text-primary hover:bg-primary/5 transition-colors disabled:opacity-60"
+                      :disabled="syncLoading"
+                      @click="startTelegramSync(conversationAccount.id)"
+                      title="Sync Telegram"
+                    >
+                      <span class="material-symbols-outlined text-lg">sync</span>
+                    </button>
+                    <button
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                      @click="refreshInbox"
+                      title="Refresh"
+                    >
+                      <span class="material-symbols-outlined text-lg">refresh</span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+              <p v-if="restoreMessage" class="mb-2 text-body-sm text-on-surface-variant">{{ restoreMessage }}</p>
+              <div v-if="pinnedMessage" class="mb-2 flex items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-body-sm text-body-sm">
+                <div class="min-w-0 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-base text-primary">push_pin</span>
+                  <span class="text-on-surface-variant">Pinned:</span>
+                  <span class="truncate text-on-surface">{{ messageDisplayText(pinnedMessage) || pinnedMessage.attachment_name || 'Attachment' }}</span>
+                </div>
+                <button class="text-primary font-label-md text-label-md hover:underline" @click="pinnedMessage = null">Unpin</button>
+              </div>
+
+              <div
+                ref="messagesPanel"
+                class="bg-surface-container-low rounded-2xl border border-outline-variant p-2 overflow-y-auto space-y-2 flex-1 min-h-0"
+              >
+                <template v-if="activeChat">
+                  <div v-if="visibleMessages.length" class="space-y-2">
+                    <div
+                      v-for="message in visibleMessages"
+                      :key="message.id"
+                      class="flex items-end gap-2"
+                      :class="message.direction === 'out' ? 'justify-end' : 'justify-start'"
+                    >
+                      <div v-if="message.direction === 'in'" class="h-8 w-8 shrink-0 self-end">
+                        <img
+                          v-if="chatAvatarUrl(activeChat)"
+                          :src="chatAvatarUrl(activeChat)"
+                          :alt="`${activeChat?.title || 'Customer'} profile photo`"
+                          class="h-8 w-8 rounded-full object-cover border border-outline-variant bg-surface-container-low"
+                          @error="markChatAvatarMissing(activeChat)"
+                        />
+                        <div
+                          v-else
+                          class="h-8 w-8 rounded-full bg-primary/10 text-primary grid place-items-center font-label-sm text-label-sm border border-primary/10"
+                        >
+                          {{ chatInitials(activeChat) }}
+                        </div>
+                      </div>
+                      <div class="relative group" :class="mobileShowMessages ? 'max-w-[85%]' : 'max-w-[70%] lg:max-w-[54%]'" data-message-menu>
+                        <div
+                          class="rounded-2xl px-3 py-2"
+                          :class="messageBubbleClass(message)"
+                          @contextmenu.prevent.stop="openMessageMenu(message, $event)"
+                        >
+                          <button
+                            type="button"
+                            class="absolute top-1.5 h-7 w-7 rounded-full grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            :class="message.direction === 'out' ? '-left-9 bg-surface-container-lowest text-on-surface-variant hover:text-primary' : '-right-9 bg-surface-container-lowest text-on-surface-variant hover:text-primary'"
+                            @click.stop="openMessageMenu(message, $event)"
+                            title="Message actions"
+                          >
+                            <span class="material-symbols-outlined text-base">expand_more</span>
+                          </button>
+
+                          <div class="flex items-center justify-between gap-3 text-xs uppercase tracking-wide" :class="messageMetaClass(message)">
+                            <span class="font-semibold">{{ message.sender_name }}</span>
+                            <div class="flex items-center gap-1.5">
+                              <span>{{ formatTimestamp(message.created_at) }}</span>
+                              <span
+                                v-if="message.delivery_status === 'failed'"
+                                class="px-2 py-0.5 rounded-full font-semibold bg-error-container text-error"
+                              >
+                                Failed
+                              </span>
+                              <!-- Read receipt ticks for outgoing messages -->
+                              <span v-if="message.direction === 'out' && message.delivery_status !== 'failed'" class="inline-flex items-center ml-0.5" :title="tickTooltip(message)">
+                                <!-- Pending / Sending: clock icon -->
+                                <svg v-if="message.delivery_status === 'pending' || message.delivery_status === 'queued' || message.delivery_status === 'sending'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50">
+                                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <!-- Sent: single tick -->
+                                <svg v-else-if="message.delivery_status === 'sent'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-70">
+                                  <polyline points="6 12 10 16 18 8"/>
+                                </svg>
+                                <!-- Read: double tick -->
+                                <svg v-else-if="message.delivery_status === 'read'" width="20" height="16" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #4fc3f7;">
+                                  <polyline points="3 12 7 16 15 8"/><polyline points="10 12 14 16 22 8"/>
+                                </svg>
+                              </span>
+                            </div>
+                          </div>
+
+                          <p v-if="messageDisplayText(message)" class="mt-2 whitespace-pre-wrap text-body-md leading-6">{{ messageDisplayText(message) }}</p>
+
+                          <div v-if="message.attachment_url" class="mt-3 space-y-2">
+                            <div v-if="messageShouldShowAttachmentBadge(message)" class="flex items-center gap-2 text-xs" :class="attachmentBadgeClass(message)">
+                              <span class="material-symbols-outlined text-sm">attachment</span>
+                              <span>{{ messageAttachmentLabel(message) }}</span>
+                              <span v-if="message.attachment_size">&middot; {{ formatFileSize(message.attachment_size) }}</span>
+                            </div>
+
+                          <template v-if="messageIsGifVideo(message)">
+                            <div class="relative overflow-hidden rounded-xl">
+                              <video
+                                class="max-h-72 w-full border border-white/10 bg-black"
+                                autoplay
+                                loop
+                                muted
+                                playsinline
+                                @click="openMediaViewer(message)"
+                              >
+                                <source :src="message.attachment_url" :type="message.attachment_mime || 'video/mp4'" />
+                              </video>
+                              <div v-if="messageIsSendingMedia(message)" class="absolute inset-0 flex items-center justify-center bg-black/35">
+                                <div class="h-12 w-12 rounded-full border-2 border-white/40 bg-black/35 text-white grid place-items-center text-xs font-semibold">
+                                  {{ messageSendProgress(message) }}%
+                                </div>
+                              </div>
+                            </div>
+                          </template>
+
+                          <div v-else-if="messageCanPreviewAsImage(message)" class="relative overflow-hidden rounded-xl">
+                            <img
+                              :src="message.attachment_url"
+                              :alt="message.attachment_name || 'Image attachment'"
+                              class="max-h-72 w-full object-cover border border-white/10 cursor-zoom-in"
+                              @click="openMediaViewer(message)"
+                            />
+                            <div v-if="messageIsSendingMedia(message)" class="absolute inset-0 flex items-center justify-center bg-black/35">
+                              <div class="h-12 w-12 rounded-full border-2 border-white/40 bg-black/35 text-white grid place-items-center text-xs font-semibold">
+                                {{ messageSendProgress(message) }}%
+                              </div>
+                            </div>
+                          </div>
+
+                          <div v-else-if="messageIsVideo(message)" class="relative overflow-hidden rounded-xl">
+                            <video
+                              class="max-h-72 w-full border border-white/10 bg-black"
+                              controls
+                              playsinline
+                            >
+                              <source :src="message.attachment_url" :type="message.attachment_mime || 'video/mp4'" />
+                            </video>
+                            <div v-if="messageIsSendingMedia(message)" class="absolute inset-0 flex items-center justify-center bg-black/35">
+                              <div class="h-12 w-12 rounded-full border-2 border-white/40 bg-black/35 text-white grid place-items-center text-xs font-semibold">
+                                {{ messageSendProgress(message) }}%
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            v-else-if="messageIsAudio(message)"
+                            class="relative min-w-[250px] max-w-full rounded-2xl p-2"
+                            :class="message.direction === 'out' ? 'bg-white/10' : 'bg-surface-container-low'"
+                          >
+                            <div class="flex items-center gap-3">
+                              <button
+                                type="button"
+                                class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors"
+                                :class="message.direction === 'out' ? 'bg-white text-primary' : 'bg-[#4aa3df] text-white'"
+                                @click="toggleAudioPlayback(message)"
+                                :title="isAudioPlaying(message) ? 'Pause voice message' : 'Play voice message'"
+                              >
+                                <span class="material-symbols-outlined text-xl">
+                                  {{ isAudioPlaying(message) ? 'pause' : 'play_arrow' }}
+                                </span>
+                              </button>
+                              <div class="min-w-0 flex-1">
+                                <div class="flex h-8 items-center gap-0.5 overflow-hidden">
+                                  <span
+                                    v-for="(bar, index) in playbackWaveformFor(message)"
+                                    :key="index"
+                                    class="w-1 rounded-full transition-[height] duration-75"
+                                    :class="message.direction === 'out' ? 'bg-white/75' : 'bg-[#4aa3df]/75'"
+                                    :style="{ height: `${bar}%` }"
+                                  ></span>
+                                </div>
+                                <div
+                                  class="mt-1 flex items-center gap-1 text-xs tabular-nums"
+                                  :class="message.direction === 'out' ? 'text-white/80' : 'text-on-surface-variant'"
+                                >
+                                  <span>{{ formatVoiceDuration(audioPlaybackTime(message)) }}</span>
+                                  <span v-if="message.attachment_size">&middot;</span>
+                                  <span v-if="message.attachment_size">{{ formatFileSize(message.attachment_size) }}</span>
+                                  <span v-if="messageAudioLabel(message)">&middot;</span>
+                                  <span>{{ messageAudioLabel(message) }}</span>
+                                </div>
+                              </div>
+                              <a
+                                :href="message.attachment_url"
+                                target="_blank"
+                                rel="noreferrer"
+                                class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full opacity-70 hover:opacity-100"
+                                :class="message.direction === 'out' ? 'text-white' : 'text-on-surface-variant'"
+                                title="Open audio file"
+                              >
+                                <span class="material-symbols-outlined text-base">open_in_new</span>
+                              </a>
+                            </div>
+                            <audio
+                              preload="metadata"
+                              class="hidden"
+                              :ref="(element) => setMessageAudioRef(message.id, element)"
+                              @play="handleAudioPlay(message, $event)"
+                              @pause="handleAudioPause(message)"
+                              @ended="handleAudioEnded(message)"
+                              @timeupdate="handleAudioTimeUpdate(message, $event)"
+                              @loadedmetadata="handleAudioLoadedMetadata(message, $event)"
+                            >
+                              <source :src="message.attachment_url" :type="message.attachment_mime || 'audio/ogg'" />
+                            </audio>
+                            <div v-if="messageIsSendingMedia(message)" class="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/20">
+                              <div class="h-10 w-10 rounded-full border-2 border-white/40 bg-black/35 text-white grid place-items-center text-xs font-semibold">
+                                {{ messageSendProgress(message) }}%
+                              </div>
+                            </div>
+                          </div>
+
+                          <div v-else-if="messageIsSticker(message)" class="relative max-w-[140px] max-h-[140px] my-1">
+                            <template v-if="message.attachment_name && message.attachment_name.endsWith('.tgs')">
+                              <tgs-sticker :url="message.attachment_url" :alt="message.attachment_name || 'Animated Sticker (.tgs)'"></tgs-sticker>
+                            </template>
+                            <template v-else>
+                              <img
+                                :src="message.attachment_url"
+                                :alt="message.attachment_name || 'Sticker'"
+                                class="w-full h-full object-contain cursor-zoom-in hover:scale-105 transition-transform duration-200"
+                                @click="openMediaViewer(message)"
+                              />
+                            </template>
+                            <div v-if="messageIsSendingMedia(message)" class="absolute inset-0 flex items-center justify-center bg-black/35 rounded-xl">
+                              <div class="h-8 w-8 rounded-full border-2 border-white/40 bg-black/35 text-white grid place-items-center text-[10px] font-semibold">
+                                {{ messageSendProgress(message) }}%
+                              </div>
+                            </div>
+                          </div>
+
+                          <a
+                            v-else
+                            :href="message.attachment_url"
+                            target="_blank"
+                            rel="noreferrer"
+                            class="inline-flex items-center gap-1 text-sm underline"
+                          >
+                            Open attachment
+                            <span class="material-symbols-outlined text-sm">open_in_new</span>
+                          </a>
+                          </div>
+                        </div>
+
+                        <div v-if="message.local_reaction" class="mt-1 flex" :class="message.direction === 'out' ? 'justify-end pr-2' : 'justify-start pl-2'">
+                          <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-surface-container-lowest border border-outline-variant px-1 text-sm shadow-sm">
+                            {{ message.local_reaction }}
+                          </span>
+                        </div>
+
+                        <div
+                          v-if="isMessageMenuOpen(message)"
+                          class="absolute z-40 min-w-52"
+                          :class="message.direction === 'out' ? 'right-0 bottom-full mb-2' : 'left-0 bottom-full mb-2'"
+                        >
+                          <div class="mb-2 inline-flex items-center gap-1 rounded-full bg-[#172331] px-2 py-1 shadow-xl ring-1 ring-white/10">
+                            <button
+                              v-for="reaction in messageReactionOptions"
+                              :key="reaction"
+                              type="button"
+                              class="h-8 w-8 rounded-full text-xl hover:bg-white/10 transition-transform hover:scale-110"
+                              @click.stop="setMessageReaction(message, reaction)"
+                            >
+                              {{ reaction }}
+                            </button>
+                            <button type="button" class="h-8 w-8 rounded-full grid place-items-center text-white/70 hover:bg-white/10" @click.stop="closeMessageMenu">
+                              <span class="material-symbols-outlined text-base">expand_more</span>
+                            </button>
+                          </div>
+                          <div class="overflow-hidden rounded-xl bg-[#172331] py-1 text-white shadow-xl ring-1 ring-white/10">
+                            <button
+                              v-for="item in messageMenuItems(message)"
+                              :key="item.key"
+                              type="button"
+                              class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors"
+                              :class="[
+                                item.enabled ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed',
+                                item.danger ? 'text-red-200' : 'text-white'
+                              ]"
+                              :disabled="!item.enabled"
+                              @click.stop="handleMessageMenuAction(item, message)"
+                            >
+                              <span class="material-symbols-outlined text-[20px]">{{ item.icon }}</span>
+                              <span>{{ item.label }}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else class="h-full flex items-center justify-center text-center text-on-surface-variant">
+                    <div>
+                      <span class="material-symbols-outlined text-5xl">chat_bubble</span>
+                      <p class="mt-3 font-headline-sm text-headline-sm text-on-surface">No messages yet</p>
+                      <p class="font-body-sm text-body-sm mt-1">Send a text, image, video, GIF, or sticker to start the thread.</p>
+                    </div>
+                  </div>
+                </template>
+
+                <div v-else class="h-full flex items-center justify-center text-center text-on-surface-variant">
+                  <div>
+                    <span class="material-symbols-outlined text-5xl">forum</span>
+                    <p class="mt-3 font-headline-sm text-headline-sm text-on-surface">Pick a chat</p>
+                    <p class="font-body-sm text-body-sm mt-1">Choose a chat from the left panel to open the conversation.</p>
+                  </div>
+                </div>
+              </div>
+
+              <form ref="composerSection" class="mt-2 bg-surface-container-lowest border border-outline-variant rounded-2xl p-2 shrink-0" @submit.prevent="sendMessage">
+                <div v-if="replyTarget && !voiceRecording" class="mb-2 flex items-center justify-between gap-3 rounded-xl bg-surface-container-low px-3 py-2">
+                  <div class="min-w-0 border-l-2 border-primary pl-3">
+                    <p class="font-label-md text-label-md text-primary">Reply to {{ replyTarget.sender_name }}</p>
+                    <p class="truncate font-body-sm text-body-sm text-on-surface-variant">
+                      {{ messageDisplayText(replyTarget) || replyTarget.attachment_name || 'Attachment' }}
+                    </p>
+                  </div>
+                  <button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant" @click="clearReplyTarget">
+                    <span class="material-symbols-outlined text-base">close</span>
+                  </button>
+                </div>
+                <div v-if="voiceRecording" class="flex min-h-[56px] items-center gap-3 rounded-2xl bg-surface-container-low px-3 py-2">
+                  <button
+                    type="button"
+                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-error text-error hover:bg-error-container transition-colors"
+                    @pointerdown.prevent="cancelVoiceRecording"
+                    title="Cancel voice recording"
+                  >
+                    <span class="material-symbols-outlined text-base">close</span>
+                  </button>
+                  <div class="min-w-[48px] font-label-md text-label-md text-primary tabular-nums">
+                    {{ formatVoiceDuration(voiceRecordSeconds) }}
+                  </div>
+                  <div class="flex h-9 flex-1 items-center gap-1 overflow-hidden rounded-full bg-surface-container-lowest px-3">
+                    <span
+                      v-for="(bar, index) in voiceWaveformBars"
+                      :key="index"
+                      class="w-1 rounded-full bg-primary/70 transition-[height] duration-75"
+                      :style="{ height: `${bar}%` }"
+                    ></span>
+                  </div>
+                  <div class="hidden sm:block whitespace-nowrap font-body-sm text-body-sm text-on-surface-variant">Release to send</div>
+                  <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+                    <span class="material-symbols-outlined text-base">mic</span>
+                  </div>
+                </div>
+                <p v-else-if="voiceRecordError" class="mb-1 text-xs text-error">{{ voiceRecordError }}</p>
+
+                <div v-if="sendMediaFile && !voiceRecording" class="mb-2 rounded-xl border border-outline-variant bg-surface-container-low overflow-hidden">
+                  <div class="px-3 py-2 flex items-center justify-between gap-3">
+                    <div class="min-w-0 flex items-center gap-2">
+                      <span class="material-symbols-outlined text-base text-primary">attachment</span>
+                      <span class="font-body-sm text-body-sm text-on-surface-variant truncate max-w-72">{{ sendMediaName }}</span>
+                    </div>
+                    <button type="button" class="font-label-md text-label-md text-primary hover:underline shrink-0" @click="clearSendMedia">Remove</button>
+                  </div>
+                  <div v-if="sendMediaPreviewIsImageLike()" class="px-3 pb-3">
+                    <img :src="sendMediaPreviewUrl" :alt="sendMediaName" class="max-h-28 rounded-lg bg-black/5 object-contain" />
+                  </div>
+                  <div v-else-if="sendMediaPreviewType === 'video'" class="px-3 pb-3">
+                    <video :src="sendMediaPreviewUrl" class="max-h-28 rounded-lg bg-black" controls playsinline></video>
+                  </div>
+                  <div v-else-if="sendMediaPreviewType === 'audio' || sendMediaPreviewType === 'voice'" class="px-3 pb-3">
+                    <audio controls class="w-full">
+                      <source :src="sendMediaPreviewUrl" :type="sendMediaFile?.type || 'audio/ogg'" />
+                    </audio>
+                  </div>
+                </div>
+
+                <div v-if="!voiceRecording" class="flex items-end gap-2">
+                  <div class="relative shrink-0">
+                    <button
+                      ref="composerAttachButton"
+                      type="button"
+                      class="inline-flex items-center justify-center rounded-full border border-outline-variant text-on-surface hover:bg-surface-container-low transition-colors"
+                      :class="[
+                        mobileShowMessages ? 'h-9 w-9' : 'h-11 w-11',
+                        composerAttachMenuOpen ? 'bg-primary/10 border-primary text-primary' : ''
+                      ]"
+                      @click.stop="toggleComposerAttachMenu"
+                    >
+                      <span class="material-symbols-outlined text-base">attach_file</span>
+                    </button>
+
+                    <div
+                      v-if="composerAttachMenuOpen"
+                      ref="composerAttachMenu"
+                      class="absolute bottom-full left-0 mb-3 w-72 rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-lg overflow-hidden z-20"
+                    >
+                      <button type="button" class="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-container-low transition-colors text-left" @click="triggerPhotoVideoPicker">
+                        <span class="material-symbols-outlined text-base text-primary">image</span>
+                        <div>
+                          <p class="font-label-md text-label-md text-on-surface">Photo or video</p>
+                          <p class="font-body-sm text-body-sm text-on-surface-variant">Send a photo or clip</p>
+                        </div>
+                      </button>
+                      <button type="button" class="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-container-low transition-colors text-left" @click="triggerDocumentPicker">
+                        <span class="material-symbols-outlined text-base text-primary">description</span>
+                        <div>
+                          <p class="font-label-md text-label-md text-on-surface">Document</p>
+                          <p class="font-body-sm text-body-sm text-on-surface-variant">Send any file</p>
+                        </div>
+                      </button>
+                      <button type="button" class="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-container-low transition-colors text-left" @click="triggerStickerPicker">
+                        <span class="material-symbols-outlined text-base text-primary">sticky_note_2</span>
+                        <div>
+                          <p class="font-label-md text-label-md text-on-surface">Sticker</p>
+                          <p class="font-body-sm text-body-sm text-on-surface-variant">Choose a sticker file</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <textarea
+                    ref="composerTextarea"
+                    v-model="composerText"
+                    rows="1"
+                    class="min-h-[44px] max-h-[92px] flex-1 rounded-2xl border border-outline-variant bg-surface-container-low px-4 py-2.5 resize-none focus:border-primary focus:ring-0"
+                    placeholder="Write a message..."
+                    @keydown.enter.exact.prevent="sendMessage"
+                  ></textarea>
+
+                  <button
+                    type="button"
+                    class="inline-flex shrink-0 items-center justify-center rounded-full border border-outline-variant text-on-surface hover:bg-surface-container-low transition-colors"
+                    :class="mobileShowMessages ? 'h-9 w-9' : 'h-11 w-11'"
+                    @click="triggerStickerPicker"
+                    title="Send sticker"
+                  >
+                    <span class="material-symbols-outlined text-base">mood</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex shrink-0 items-center justify-center rounded-full border transition-colors"
+                    :class="[
+                      voiceRecording ? 'border-error text-error bg-error-container' : 'border-outline-variant text-on-surface hover:bg-surface-container-low',
+                      mobileShowMessages ? 'h-9 w-9' : 'h-11 w-11'
+                    ]"
+                    @mousedown.prevent="startVoiceRecording"
+                    @touchstart.prevent="startVoiceRecording"
+                    title="Hold to record voice"
+                  >
+                    <span class="material-symbols-outlined text-base">{{ voiceRecording ? 'mic_off' : 'mic' }}</span>
+                  </button>
+                    <button
+                    type="submit"
+                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary text-white hover:bg-primary-container transition-colors disabled:opacity-60"
+                    :class="mobileShowMessages ? 'h-9 w-9 rounded-full px-0' : 'h-11 px-4'"
+                    :disabled="sendLoading || (!composerText.trim() && !sendMediaFile)"
+                  >
+                    <span class="material-symbols-outlined text-base">send</span>
+                    <span v-if="!mobileShowMessages" class="font-label-md text-label-md">{{ sendLoading ? 'Sending...' : 'Send' }}</span>
+                  </button>
+                </div>
+
+                <input ref="sendMediaInput" type="file" accept="image/*,video/*,audio/*" class="hidden" @change="onSendMediaSelected" />
+                <input ref="sendDocumentInput" type="file" class="hidden" @change="onSendMediaSelected" />
+                <input ref="sendStickerInput" type="file" accept="image/webp,image/gif,.webp,.gif,.tgs" class="hidden" @change="onSendMediaSelected" />
+              </form>
+            </section>
+
+
+          </div>
+        </section>
+      </main>
+
+      <div v-if="actionNotice" class="fixed bottom-6 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-[#172331] px-4 py-2 text-sm text-white shadow-xl">
+        {{ actionNotice }}
+      </div>
+
+      <button
+        v-if="notificationToast"
+        type="button"
+        class="toast-notification fixed bottom-6 right-6 z-[82] flex w-[min(24rem,calc(100vw-2rem))] items-start gap-3 rounded-2xl border bg-surface-container-lowest p-4 text-left shadow-2xl ring-1 ring-black/5 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(15,23,42,0.22)] overflow-hidden"
+        :class="notificationToast.preview ? 'border-outline-variant' : 'border-primary/40'"
+        @click="openNotificationToast(notificationToast)"
+      >
+        <!-- Progress bar -->
+        <div class="absolute bottom-0 left-0 h-[3px] rounded-full bg-gradient-to-r from-primary to-primary-container"
+          :class="notificationToast.preview ? 'toast-progress-bar-preview' : 'toast-progress-bar'"
+        ></div>
+
+        <!-- Close button -->
+        <span
+          class="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container-high transition-colors z-10"
+          @click.stop="notificationToast = null"
+          title="Dismiss"
+        >
+          <span class="material-symbols-outlined text-sm">close</span>
+        </span>
+
+        <div class="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-primary/10 text-primary grid place-items-center border border-primary/10">
+          <img
+            v-if="notificationToast.iconUrl"
+            :src="notificationToast.iconUrl"
+            :alt="`${notificationToast.title} profile photo`"
+            class="h-full w-full object-cover"
+          />
+          <span v-else class="material-symbols-outlined text-xl">notifications</span>
+          <!-- Platform badge dot -->
+          <span v-if="!notificationToast.preview" class="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary grid place-items-center ring-2 ring-surface-container-lowest">
+            <span class="material-symbols-outlined text-[9px] text-white leading-none">chat</span>
+          </span>
+        </div>
+        <div class="min-w-0 flex-1 pr-4">
+          <div class="flex items-center justify-between gap-3">
+            <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-primary">{{ notificationToast.accountLabel }}</p>
+            <span class="shrink-0 text-[10px] text-on-surface-variant">now</span>
+          </div>
+          <p class="mt-1 truncate font-label-md text-label-md text-on-surface">{{ notificationToast.title }}</p>
+          <p class="mt-0.5 line-clamp-2 text-body-sm text-body-sm text-on-surface-variant">{{ notificationToast.body }}</p>
+        </div>
+      </button>
+
+      <div v-if="renameDialog.open" class="fixed inset-0 z-[74] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl overflow-hidden">
+          <div class="flex items-start justify-between gap-4 border-b border-outline-variant px-5 py-4">
+            <div>
+              <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Rename customer</p>
+              <h3 class="font-headline-sm text-headline-sm text-on-surface mt-1">Edit display name</h3>
+            </div>
+            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant" :disabled="renameDialog.loading" @click="closeRenameChatDialog">
+              <span class="material-symbols-outlined text-base">close</span>
+            </button>
+          </div>
+          <form class="space-y-4 px-5 py-5" @submit.prevent="confirmRenameChat">
+            <div>
+              <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Customer name</label>
+              <input
+                ref="renameChatInput"
+                v-model="renameDialog.displayName"
+                type="text"
+                class="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-on-surface focus:border-primary focus:outline-none"
+                placeholder="Enter customer name"
+              />
+              <p v-if="renameDialog.chat?.telegram_title && renameDialog.chat.telegram_title !== renameDialog.displayName" class="mt-2 text-xs text-on-surface-variant">
+                Telegram original: {{ renameDialog.chat.telegram_title }}
+              </p>
+            </div>
+            <label class="flex items-start gap-3 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-3 text-body-sm text-on-surface cursor-pointer">
+              <input v-model="renameDialog.syncTelegram" type="checkbox" class="mt-1 h-4 w-4 accent-primary" />
+              <span>
+                <span class="font-medium">Also update Telegram contact name</span>
+                <span class="mt-1 block text-on-surface-variant">Works for private Telegram users saved as contacts. Usernames and customer profile names cannot be changed.</span>
+              </span>
+            </label>
+            <p v-if="renameDialog.warning" class="rounded-xl bg-amber-100 px-3 py-2 text-sm text-amber-800">{{ renameDialog.warning }}</p>
+            <p v-if="renameDialog.error" class="rounded-xl bg-red-100 px-3 py-2 text-sm text-red-700">{{ renameDialog.error }}</p>
+            <div class="flex justify-end gap-2 pt-1">
+              <button type="button" class="rounded-lg border border-outline px-4 py-2 text-on-surface hover:bg-surface-container-low disabled:opacity-50" :disabled="renameDialog.loading" @click="closeRenameChatDialog">
+                Cancel
+              </button>
+              <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary/90 disabled:opacity-50" :disabled="renameDialog.loading || !renameDialog.displayName.trim()">
+                {{ renameDialog.loading ? 'Saving...' : 'Save name' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div v-if="deleteDialog.open" class="fixed inset-0 z-[75] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-sm rounded-xl bg-[#17212b] text-white shadow-2xl overflow-hidden">
+          <div class="px-6 pt-6 pb-4">
+            <h3 class="text-base font-medium">Do you want to delete this message?</h3>
+            <label class="mt-5 flex items-center gap-3 text-sm select-none cursor-pointer">
+              <span class="relative inline-flex h-6 w-6 items-center justify-center rounded bg-[#4f8ecb]">
+                <input v-model="deleteDialog.deleteForEveryone" type="checkbox" class="absolute inset-0 opacity-0 cursor-pointer" />
+                <span v-if="deleteDialog.deleteForEveryone" class="material-symbols-outlined text-base leading-none">check</span>
+              </span>
+              <span>Also delete for {{ deleteForName }}</span>
+            </label>
+            <p v-if="deleteDialog.error" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {{ deleteDialog.error }}
+            </p>
+          </div>
+          <div class="flex justify-end gap-2 px-5 pb-4">
+            <button type="button" class="rounded-lg px-4 py-2 text-[#6ab7ff] hover:bg-white/5 disabled:opacity-50" :disabled="deleteDialog.loading" @click="closeDeleteDialog">
+              Cancel
+            </button>
+            <button type="button" class="rounded-lg px-4 py-2 text-[#6ab7ff] hover:bg-white/5 disabled:opacity-50" :disabled="deleteDialog.loading" @click="confirmDeleteMessage">
+              {{ deleteDialog.loading ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="forwardSource" class="fixed inset-0 z-[65] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between gap-3 border-b border-outline-variant px-5 py-4">
+            <div class="min-w-0">
+              <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Forward</p>
+              <h3 class="font-headline-sm text-headline-sm text-on-surface mt-1">Choose a chat</h3>
+              <p class="mt-1 truncate font-body-sm text-body-sm text-on-surface-variant">
+                {{ messageDisplayText(forwardSource) || forwardSource.attachment_name || 'Attachment' }}
+              </p>
+            </div>
+            <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant" :disabled="forwardLoading" @click="closeForwardModal">
+              <span class="material-symbols-outlined text-base">close</span>
+            </button>
+          </div>
+          <div class="border-b border-outline-variant px-4 py-3">
+            <label class="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 focus-within:border-primary">
+              <span class="material-symbols-outlined text-base text-on-surface-variant">search</span>
+              <input
+                ref="forwardSearchInput"
+                v-model="forwardSearchQuery"
+                type="search"
+                class="min-w-0 flex-1 border-none bg-transparent p-0 text-body-sm text-body-sm text-on-surface outline-none focus:ring-0 placeholder:text-on-surface-variant/60"
+                placeholder="Search customer, username, or ID..."
+              />
+              <button
+                v-if="forwardSearchQuery"
+                type="button"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+                @click="forwardSearchQuery = ''; $nextTick(() => $refs.forwardSearchInput?.focus?.())"
+              >
+                <span class="material-symbols-outlined text-sm">close</span>
+              </button>
+            </label>
+          </div>
+          <div class="max-h-96 overflow-y-auto p-3">
+            <button
+              v-for="chat in forwardTargetChats"
+              :key="chat.id"
+              type="button"
+              class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-surface-container-low transition-colors disabled:opacity-60"
+              :disabled="forwardLoading"
+              @click="forwardMessageToChat(chat)"
+            >
+              <div class="relative h-10 w-10 shrink-0">
+                <img
+                  v-if="chatAvatarUrl(chat)"
+                  :src="chatAvatarUrl(chat)"
+                  :alt="`${chat.title} profile photo`"
+                  class="h-10 w-10 rounded-full object-cover border border-outline-variant bg-surface-container-low"
+                  @error="markChatAvatarMissing(chat)"
+                />
+                <div
+                  v-else
+                  class="h-10 w-10 rounded-full bg-primary/10 text-primary grid place-items-center font-label-md text-label-md border border-primary/10"
+                >
+                  {{ chatInitials(chat) }}
+                </div>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="font-label-md text-label-md text-on-surface truncate">{{ chat.title }}</p>
+                <p class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ chatProfileSubtitle(chat) }}</p>
+              </div>
+              <span class="material-symbols-outlined text-base text-on-surface-variant">send</span>
+            </button>
+            <div v-if="!forwardTargetChats.length" class="rounded-xl border border-dashed border-outline-variant p-4 text-center text-on-surface-variant">
+              {{ forwardSearchQuery ? 'No matching customers found.' : 'No other chats available to forward to.' }}
+            </div>
+          </div>
+          <div v-if="forwardLoading" class="border-t border-outline-variant px-5 py-3 font-body-sm text-body-sm text-on-surface-variant">
+            Forwarding...
+          </div>
+        </div>
+      </div>
+
+      <div v-if="mediaViewerOpen" class="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" @click.self="closeMediaViewer">
+        <div class="relative w-full max-w-5xl max-h-[92vh] bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-2xl">
+          <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-outline-variant">
+            <div class="min-w-0">
+              <p class="font-label-md text-label-md text-on-surface uppercase tracking-wider">Media viewer</p>
+              <p class="font-body-sm text-body-sm text-on-surface-variant truncate">
+                {{ currentMediaViewerItem ? currentMediaViewerItem.message.attachment_name : '' }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" class="px-3 py-2 rounded-lg border border-outline-variant hover:bg-surface-container-low" @click="showPrevMedia" :disabled="mediaViewerItems.length <= 1">
+                <span class="material-symbols-outlined text-base">chevron_left</span>
+              </button>
+              <button type="button" class="px-3 py-2 rounded-lg border border-outline-variant hover:bg-surface-container-low" @click="showNextMedia" :disabled="mediaViewerItems.length <= 1">
+                <span class="material-symbols-outlined text-base">chevron_right</span>
+              </button>
+              <button type="button" class="px-3 py-2 rounded-lg border border-outline-variant hover:bg-surface-container-low" @click="closeMediaViewer">
+                <span class="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="p-4 bg-black flex items-center justify-center min-h-[55vh]">
+            <template v-if="currentMediaViewerItem">
+              <video
+                v-if="messageIsGifVideo(currentMediaViewerItem.message)"
+                class="max-h-[78vh] max-w-full rounded-xl bg-black"
+                autoplay
+                loop
+                muted
+                playsinline
+              >
+                <source :src="currentMediaViewerItem.message.attachment_url" :type="currentMediaViewerItem.message.attachment_mime || 'video/mp4'" />
+              </video>
+              <img
+                v-else-if="messageCanPreviewAsImage(currentMediaViewerItem.message)"
+                :src="currentMediaViewerItem.message.attachment_url"
+                :alt="currentMediaViewerItem.message.attachment_name || 'Media attachment'"
+                class="max-h-[78vh] max-w-full object-contain rounded-xl"
+              />
+              <video
+                v-else-if="messageIsVideo(currentMediaViewerItem.message)"
+                class="max-h-[78vh] max-w-full rounded-xl bg-black"
+                controls
+                autoplay
+                playsinline
+              >
+                <source :src="currentMediaViewerItem.message.attachment_url" :type="currentMediaViewerItem.message.attachment_mime || 'video/mp4'" />
+              </video>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showAccountModal" class="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-5 border-b border-outline-variant">
+            <div>
+              <div class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Platform Account</div>
+              <h3 class="font-headline-md text-headline-md text-on-surface mt-1">{{ modalTitle }}</h3>
+            </div>
+            <button class="p-2 rounded-full hover:bg-surface-container-low" @click="closeAccountModal">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <form class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="saveAccount">
+            <div class="md:col-span-2">
+              <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Display name</label>
+              <input v-model="modalForm.display_name" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="Support team or channel name" />
+            </div>
+
+            <div>
+              <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Platform</label>
+              <select v-model="modalForm.platform" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low">
+                <option value="telegram">Telegram</option>
+                <option value="facebook_page">Facebook Page</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+                <option value="line">LINE</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-label-md text-label-md text-on-surface-variant mb-2">{{ identifierLabel }}</label>
+              <input v-model="modalForm.identifier" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" :placeholder="identifierPlaceholder" />
+              <p class="mt-2 text-body-sm text-on-surface-variant">{{ identifierHint }}</p>
+            </div>
+
+            <template v-if="isTelegramPlatform">
+              <div>
+                <label class="block font-label-md text-label-md text-on-surface-variant mb-2">API ID</label>
+                <input v-model="modalForm.api_id" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="1234567" />
+              </div>
+              <div>
+                <label class="block font-label-md text-label-md text-on-surface-variant mb-2">API Hash</label>
+                <input v-model="modalForm.api_hash" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="abcdef123..." />
+              </div>
+            </template>
+
+            <div class="md:col-span-2 bg-primary-container/10 border border-primary-container/20 rounded-xl p-4 text-on-surface-variant">
+              <template v-if="isTelegramPlatform">
+                Telegram accounts need <code>API ID</code> and <code>API Hash</code> from <a href="https://my.telegram.org" target="_blank" rel="noreferrer" class="text-primary underline">my.telegram.org</a>.
+              </template>
+              <template v-else-if="isFacebookPlatform">
+                Connect your Facebook account to see all Pages you manage. Click <strong>Login with Facebook</strong> below to get started.
+              </template>
+              <template v-else>
+                WhatsApp, Instagram, and LINE accounts can be added as platform records now and connected to external services later.
+              </template>
+            </div>
+
+            <template v-if="isTelegramPlatform">
+              <div class="md:col-span-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
+                <h4 class="font-headline-sm text-headline-sm text-on-surface mb-2">Telegram Login</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Save the profile first, then request a code, enter the OTP, and add the 2FA password if needed.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="md:col-span-2">
+                    <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Phone for login</label>
+                    <input v-model="loginPhone" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="+855 100 000 001" />
+                  </div>
+
+                  <div>
+                    <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Login code</label>
+                    <input v-model="loginCode" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="12345" />
+                  </div>
+
+                  <div>
+                    <label class="block font-label-md text-label-md text-on-surface-variant mb-2">2FA password</label>
+                    <input v-model="loginPassword" type="password" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="If your account has 2FA" />
+                  </div>
+                </div>
+
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                  <button type="button" class="px-4 py-2 rounded-lg border border-primary text-primary hover:bg-primary/5 transition-colors disabled:opacity-60" :disabled="loginBusy" @click="requestTelegramCode">
+                    {{ loginBusy ? 'Working...' : 'Send code' }}
+                  </button>
+                  <button type="button" class="px-4 py-2 rounded-lg border border-outline text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-60" :disabled="loginBusy" @click="confirmTelegramCode">
+                    Verify code
+                  </button>
+                  <button type="button" class="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container transition-colors disabled:opacity-60" :disabled="loginBusy" @click="confirmTelegramPassword">
+                    Verify password
+                  </button>
+                </div>
+
+                <p v-if="loginMessage" class="mt-3 text-body-sm text-primary">{{ loginMessage }}</p>
+                <p v-if="modalMode === 'edit' && modalAccountId && (activeAccount && activeAccount.last_error)" class="mt-2 text-body-sm text-error">
+                  Last backend error: {{ activeAccount.last_error }}
+                </p>
+              </div>
+            </template>
+
+            <template v-if="isFacebookPlatform">
+              <div class="md:col-span-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
+                <h4 class="font-headline-sm text-headline-sm text-on-surface mb-2">Facebook Page Connection</h4>
+
+                <!-- OAuth Page Selector -->
+                <div v-if="fbOAuthPages.length > 0" class="mb-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <span class="material-symbols-outlined text-base text-primary">check_circle</span>
+                    <p class="font-label-md text-label-md text-primary">Logged in as {{ fbOAuthUserName }}</p>
+                  </div>
+
+                  <p class="font-body-sm text-body-sm text-on-surface-variant mb-3">Select a Page to connect:</p>
+
+                  <div class="space-y-2 max-h-72 overflow-y-auto">
+                    <button
+                      v-for="page in fbOAuthPages"
+                      :key="page.id"
+                      type="button"
+                      class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left"
+                      :class="fbOAuthSelectedPageId === page.id
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-outline-variant hover:bg-surface-container-low'"
+                      @click="fbOAuthSelectedPageId = page.id"
+                    >
+                      <img
+                        v-if="page.picture_url"
+                        :src="page.picture_url"
+                        :alt="page.name"
+                        class="h-10 w-10 rounded-lg object-cover border border-outline-variant"
+                      />
+                      <div v-else class="h-10 w-10 rounded-lg bg-[#1877F2] grid place-items-center text-white">
+                        <span class="w-5 h-5" v-html="platformIcon('facebook_page')"></span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="font-label-md text-label-md text-on-surface truncate">{{ page.name }}</p>
+                        <p class="text-[11px] text-on-surface-variant">{{ page.category || 'Page' }} · ID: {{ page.id }}</p>
+                      </div>
+                      <span v-if="fbOAuthSelectedPageId === page.id" class="material-symbols-outlined text-primary text-lg">check_circle</span>
+                    </button>
+                  </div>
+
+                  <div class="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      class="px-5 py-2.5 rounded-lg bg-primary text-white hover:bg-primary-container transition-colors disabled:opacity-50"
+                      :disabled="!fbOAuthSelectedPageId || fbOAuthConnecting"
+                      @click="connectFacebookPageOAuth"
+                    >
+                      {{ fbOAuthConnecting ? 'Connecting...' : 'Connect selected Page' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-4 py-2.5 rounded-lg border border-outline text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                      @click="fbOAuthPages = []; fbOAuthToken = ''; fbOAuthSelectedPageId = ''"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Login with Facebook button -->
+                <div v-else class="mb-4">
+                  <p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Login with your Facebook account to see all Pages you manage, then select which one to connect.</p>
+
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-[#1877F2] text-white font-medium hover:bg-[#166FE5] transition-colors disabled:opacity-50 shadow-sm"
+                    :disabled="fbOAuthLoading"
+                    @click="startFacebookOAuth"
+                  >
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    {{ fbOAuthLoading ? 'Redirecting...' : 'Login with Facebook' }}
+                  </button>
+                </div>
+
+                <!-- Advanced: Manual token entry (collapsed) -->
+                <details class="mt-2 group">
+                  <summary class="cursor-pointer inline-flex items-center gap-1.5 text-xs text-on-surface-variant/70 hover:text-on-surface-variant transition-colors select-none">
+                    <span class="material-symbols-outlined text-sm transition-transform group-open:rotate-90">chevron_right</span>
+                    Advanced: Enter Page Access Token manually
+                  </summary>
+                  <div class="mt-3 pt-3 border-t border-outline-variant/50">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div class="md:col-span-2">
+                        <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Page Access Token</label>
+                        <textarea v-model="modalForm.page_access_token" rows="3" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low font-mono text-xs resize-none" placeholder="EAA..."></textarea>
+                      </div>
+
+                      <div>
+                        <label class="block font-label-md text-label-md text-on-surface-variant mb-2">Page ID <span class="text-on-surface-variant/60">(auto-detected)</span></label>
+                        <input v-model="modalForm.page_id" type="text" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="Will be detected from token" />
+                      </div>
+
+                      <div>
+                        <label class="block font-label-md text-label-md text-on-surface-variant mb-2">App Secret <span class="text-on-surface-variant/60">(optional)</span></label>
+                        <input v-model="modalForm.fb_app_secret" type="password" class="w-full rounded-xl border border-outline-variant px-4 py-3 bg-surface-container-low" placeholder="For webhook signature verification" />
+                      </div>
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                      <button type="button" class="px-4 py-2 rounded-lg border border-primary text-primary hover:bg-primary/5 transition-colors disabled:opacity-60" :disabled="fbConnectBusy" @click="connectFacebookPage">
+                        {{ fbConnectBusy ? 'Working...' : 'Connect Page' }}
+                      </button>
+                      <button type="button" class="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-container transition-colors disabled:opacity-60" :disabled="fbConnectBusy || !modalForm.page_id" @click="syncFacebookPage">
+                        Sync Conversations
+                      </button>
+                    </div>
+                  </div>
+                </details>
+
+                <p v-if="fbConnectMessage" class="mt-3 text-body-sm text-primary">{{ fbConnectMessage }}</p>
+                <p v-if="fbOAuthError" class="mt-3 text-body-sm text-error">{{ fbOAuthError }}</p>
+                <p v-if="modalMode === 'edit' && modalAccountId && (activeAccount && activeAccount.last_error)" class="mt-2 text-body-sm text-error">
+                  Last error: {{ activeAccount.last_error }}
+                </p>
+              </div>
+            </template>
+
+            <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
+              <button type="button" class="px-5 py-3 rounded-lg border border-outline text-on-surface hover:bg-surface-container-low transition-colors" @click="closeAccountModal">Cancel</button>
+              <button type="submit" class="px-5 py-3 rounded-lg bg-primary text-white hover:bg-primary-container transition-colors">{{ modalActionLabel }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

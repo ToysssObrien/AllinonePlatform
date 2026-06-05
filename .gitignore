@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+.env
+node_modules/
+logs/
+tmp_video_frames/
+uvicorn-*.log
+uvicorn-*.out.log
+uvicorn-*.err.log

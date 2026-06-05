@@ -1,0 +1,18 @@
+{
+  "name": "OmniDesk",
+  "short_name": "OmniDesk",
+  "description": "Unified customer support inbox for every platform.",
+  "start_url": "/#/conversations",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9f9ff",
+  "theme_color": "#6b38d4",
+  "icons": [
+    {
+      "src": "/static/omnidesk-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6b38d4" />
+    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <link rel="icon" href="/static/omnidesk-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/static/omnidesk-icon.svg" />
+    <title>OmniDesk — Sign In</title>
+    <meta name="description" content="Sign in to OmniDesk Customer Support Platform" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#6b38d4",
+              "primary-container": "#8455ef",
+              "inverse-surface": "#2a313d",
+              "surface-container": "#e7eefe",
+              background: "#f9f9ff",
+              surface: "#f9f9ff",
+              "on-surface": "#151c27",
+              "on-surface-variant": "#494454",
+              "outline-variant": "#cbc3d7",
+              error: "#ba1a1a",
+              "error-container": "#ffdad6",
+              tertiary: "#855000",
+              "tertiary-container": "#a76500",
+            },
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      html { scroll-behavior: smooth; }
+      body { margin: 0; font-family: "Inter", sans-serif; }
+      .material-symbols-outlined {
+        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+      }
+
+      /* Background animated gradient */
+      .login-bg {
+        background: linear-gradient(135deg, #1a1130 0%, #2a313d 40%, #1e1040 70%, #151c27 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      .login-bg::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at 30% 40%, rgba(107, 56, 212, 0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 70% 60%, rgba(132, 85, 239, 0.1) 0%, transparent 50%),
+                    radial-gradient(circle at 50% 80%, rgba(167, 101, 0, 0.08) 0%, transparent 40%);
+        animation: bg-drift 20s ease-in-out infinite alternate;
+      }
+      @keyframes bg-drift {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        100% { transform: translate(3%, -3%) rotate(3deg); }
+      }
+
+      /* Floating orbs */
+      .orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.4;
+        animation: orb-float 15s ease-in-out infinite alternate;
+      }
+      .orb-1 {
+        width: 300px;
+        height: 300px;
+        background: #6b38d4;
+        top: 10%;
+        left: 15%;
+        animation-delay: 0s;
+      }
+      .orb-2 {
+        width: 250px;
+        height: 250px;
+        background: #8455ef;
+        top: 60%;
+        right: 10%;
+        animation-delay: -5s;
+        animation-duration: 18s;
+      }
+      .orb-3 {
+        width: 200px;
+        height: 200px;
+        background: #a76500;
+        bottom: 15%;
+        left: 30%;
+        animation-delay: -10s;
+        opacity: 0.2;
+        animation-duration: 22s;
+      }
+      @keyframes orb-float {
+        0% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -20px) scale(1.05); }
+        66% { transform: translate(-15px, 15px) scale(0.95); }
+        100% { transform: translate(20px, -10px) scale(1.02); }
+      }
+
+      /* Card glass effect */
+      .login-card {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      }
+
+      /* Input focus glow */
+      .login-input {
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #fff;
+        transition: all 0.3s ease;
+      }
+      .login-input::placeholder {
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .login-input:focus {
+        outline: none;
+        border-color: #8455ef;
+        box-shadow: 0 0 0 3px rgba(107, 56, 212, 0.25), 0 0 20px rgba(107, 56, 212, 0.1);
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      /* Button shine */
+      .login-btn {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, #6b38d4, #8455ef);
+        transition: all 0.3s ease;
+      }
+      .login-btn::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+        transition: left 0.5s ease;
+      }
+      .login-btn:hover::after {
+        left: 100%;
+      }
+      .login-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 25px rgba(107, 56, 212, 0.4);
+      }
+      .login-btn:active {
+        transform: translateY(0) scale(0.98);
+      }
+      .login-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .login-btn:disabled:hover::after {
+        left: -100%;
+      }
+
+      /* Error shake */
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-8px); }
+        40% { transform: translateX(8px); }
+        60% { transform: translateX(-6px); }
+        80% { transform: translateX(6px); }
+      }
+      .shake {
+        animation: shake 0.4s ease-in-out;
+      }
+
+      /* Fade in */
+      @keyframes fade-up {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .fade-up {
+        animation: fade-up 0.6s ease-out forwards;
+      }
+      .fade-up-delay-1 { animation-delay: 0.1s; opacity: 0; }
+      .fade-up-delay-2 { animation-delay: 0.2s; opacity: 0; }
+      .fade-up-delay-3 { animation-delay: 0.3s; opacity: 0; }
+      .fade-up-delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+      /* Spinner */
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+    </style>
+  </head>
+  <body class="login-bg min-h-screen flex items-center justify-center p-4">
+    <!-- Floating orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="relative z-10 w-full max-w-md">
+      <!-- Logo & Header -->
+      <div class="text-center mb-8 fade-up">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-container mb-4 shadow-lg shadow-primary/25">
+          <span class="material-symbols-outlined text-3xl text-white" style="font-variation-settings: 'FILL' 1, 'wght' 600;">support_agent</span>
+        </div>
+        <h1 class="text-3xl font-extrabold text-white tracking-tight">OmniDesk</h1>
+        <p class="text-sm text-white/50 mt-1.5 tracking-wide">Customer Support Platform</p>
+      </div>
+
+      <!-- Login Card -->
+      <div id="login-card" class="login-card rounded-2xl p-8 fade-up fade-up-delay-1">
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-white">Welcome back</h2>
+          <p class="text-sm text-white/50 mt-1">Sign in to your workspace</p>
+        </div>
+
+        <form id="login-form" onsubmit="handleLogin(event)" autocomplete="on">
+          <!-- Error banner -->
+          <div id="error-banner" class="hidden mb-4 px-4 py-3 rounded-xl bg-error/15 border border-error/20 text-error-container text-sm flex items-center gap-2">
+            <span class="material-symbols-outlined text-base text-red-400">error</span>
+            <span id="error-text" class="text-red-300">Invalid username or password</span>
+          </div>
+
+          <!-- Username -->
+          <div class="mb-4 fade-up fade-up-delay-2">
+            <label for="username" class="block text-xs font-semibold uppercase tracking-widest text-white/60 mb-2">Username</label>
+            <div class="relative">
+              <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-white/30">person</span>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                class="login-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
+                placeholder="Enter your username"
+                autocomplete="username"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="mb-6 fade-up fade-up-delay-3">
+            <label for="password" class="block text-xs font-semibold uppercase tracking-widest text-white/60 mb-2">Password</label>
+            <div class="relative">
+              <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-white/30">lock</span>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                class="login-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                id="toggle-password"
+                onclick="togglePasswordVisibility()"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                tabindex="-1"
+                title="Show/hide password"
+              >
+                <span id="eye-icon" class="material-symbols-outlined text-lg">visibility</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <button
+            id="login-btn"
+            type="submit"
+            class="login-btn w-full rounded-xl py-3.5 text-white font-semibold text-sm tracking-wide flex items-center justify-center gap-2 fade-up fade-up-delay-4"
+          >
+            <span id="btn-text">Sign In</span>
+            <span class="material-symbols-outlined text-lg" id="btn-icon">arrow_forward</span>
+            <div id="btn-spinner" class="spinner hidden"></div>
+          </button>
+        </form>
+      </div>
+
+      <!-- Footer -->
+      <p class="text-center text-xs text-white/25 mt-6 fade-up fade-up-delay-4">
+        &copy; 2026 OmniDesk &mdash; Unified Customer Support
+      </p>
+    </div>
+
+    <script>
+      function togglePasswordVisibility() {
+        const input = document.getElementById("password");
+        const icon = document.getElementById("eye-icon");
+        if (input.type === "password") {
+          input.type = "text";
+          icon.textContent = "visibility_off";
+        } else {
+          input.type = "password";
+          icon.textContent = "visibility";
+        }
+      }
+
+      async function handleLogin(event) {
+        event.preventDefault();
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+        const errorBanner = document.getElementById("error-banner");
+        const errorText = document.getElementById("error-text");
+        const loginBtn = document.getElementById("login-btn");
+        const btnText = document.getElementById("btn-text");
+        const btnIcon = document.getElementById("btn-icon");
+        const btnSpinner = document.getElementById("btn-spinner");
+        const loginCard = document.getElementById("login-card");
+
+        // Hide previous error
+        errorBanner.classList.add("hidden");
+
+        // Show loading
+        loginBtn.disabled = true;
+        btnText.textContent = "Signing in...";
+        btnIcon.classList.add("hidden");
+        btnSpinner.classList.remove("hidden");
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "Invalid username or password");
+          }
+
+          // Success — redirect to main app
+          btnText.textContent = "Success!";
+          btnSpinner.classList.add("hidden");
+          btnIcon.textContent = "check";
+          btnIcon.classList.remove("hidden");
+          loginCard.style.borderColor = "rgba(107, 56, 212, 0.5)";
+          loginCard.style.boxShadow = "0 0 40px rgba(107, 56, 212, 0.2)";
+
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 500);
+        } catch (err) {
+          // Error — show error and shake
+          errorText.textContent = err.message;
+          errorBanner.classList.remove("hidden");
+          loginCard.classList.add("shake");
+          setTimeout(() => loginCard.classList.remove("shake"), 400);
+
+          // Reset button
+          loginBtn.disabled = false;
+          btnText.textContent = "Sign In";
+          btnIcon.textContent = "arrow_forward";
+          btnIcon.classList.remove("hidden");
+          btnSpinner.classList.add("hidden");
+
+          // Focus password field
+          document.getElementById("password").select();
+        }
+      }
+
+      // Auto-focus username on load
+      window.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("username").focus();
+      });
+    </script>
+  </body>
+</html>
