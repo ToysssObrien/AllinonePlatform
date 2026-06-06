@@ -1,27 +1,17 @@
 from __future__ import annotations
 
-import hashlib
 import logging
-import os
 import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response
-from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
+
+from ..db import get_user_by_username, verify_password
 
 logger = logging.getLogger("omnidesk.auth")
 
 router = APIRouter(tags=["auth"])
-
-# --- Admin credentials from environment variables ---
-# Set ADMIN_USERNAME and ADMIN_PASSWORD in your environment (Render dashboard).
-# Falls back to "Admin" / "123456" for local development only.
-_raw_password = os.environ.get("ADMIN_PASSWORD", "123456")
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "Admin")
-ADMIN_DISPLAY_NAME = os.environ.get("ADMIN_DISPLAY_NAME", ADMIN_USERNAME)
-ADMIN_ROLE = "Admin Account"
-ADMIN_PASSWORD_HASH = hashlib.sha256(_raw_password.encode()).hexdigest()
 
 # --- In-memory session store ---
 _sessions: dict[str, dict] = {}
@@ -35,17 +25,23 @@ class LoginPayload(BaseModel):
     password: str
 
 
-def _verify_credentials(username: str, password: str) -> bool:
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    return username == ADMIN_USERNAME and password_hash == ADMIN_PASSWORD_HASH
+def _verify_credentials(username: str, password: str) -> dict | None:
+    user = get_user_by_username(username)
+    if not user or not user.get("is_active"):
+        return None
+    if not verify_password(password, str(user.get("password_hash") or "")):
+        return None
+    return user
 
 
-def _create_session(username: str) -> str:
+def _create_session(user: dict) -> str:
     token = secrets.token_urlsafe(32)
     _sessions[token] = {
-        "username": username,
-        "display_name": ADMIN_DISPLAY_NAME if username == ADMIN_USERNAME else username,
-        "role": ADMIN_ROLE,
+        "user_id": user["id"],
+        "username": user["username"],
+        "display_name": user.get("display_name") or user["username"],
+        "role": user.get("role") or "Admin",
+        "is_super_admin": bool(user.get("is_super_admin")),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     return token
@@ -69,11 +65,12 @@ def is_authenticated(request: Request) -> bool:
 
 @router.post("/api/auth/login")
 async def api_login(payload: LoginPayload, response: Response) -> dict:
-    if not _verify_credentials(payload.username, payload.password):
+    user = _verify_credentials(payload.username, payload.password)
+    if not user:
         logger.warning("Failed login attempt for user: %s", payload.username)
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    token = _create_session(payload.username)
+    token = _create_session(user)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
@@ -81,8 +78,14 @@ async def api_login(payload: LoginPayload, response: Response) -> dict:
         samesite="lax",
         max_age=SESSION_MAX_AGE,
     )
-    logger.info("User '%s' logged in successfully", payload.username)
-    return {"status": "ok", "username": payload.username, "display_name": ADMIN_DISPLAY_NAME, "role": ADMIN_ROLE}
+    logger.info("User '%s' logged in successfully", user["username"])
+    return {
+        "status": "ok",
+        "username": user["username"],
+        "display_name": user.get("display_name") or user["username"],
+        "role": user.get("role") or "Admin",
+        "is_super_admin": bool(user.get("is_super_admin")),
+    }
 
 
 @router.post("/api/auth/logout")
@@ -103,7 +106,9 @@ async def api_me(omnidesk_session: str | None = Cookie(None)) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return {
+        "id": user.get("user_id"),
         "username": user["username"],
         "display_name": user.get("display_name") or user["username"],
-        "role": user.get("role") or ADMIN_ROLE,
+        "role": user.get("role") or "Admin",
+        "is_super_admin": bool(user.get("is_super_admin")),
     }

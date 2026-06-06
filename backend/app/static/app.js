@@ -18,7 +18,7 @@ const SIDEBAR_ITEMS = [
   { icon: "psychology", label: "AI Assistant", unavailable: true },
   { icon: "forum", label: "Quick Replies", unavailable: true },
   { icon: "analytics", label: "Analytics", unavailable: true },
-  { icon: "badge", label: "Team Members", unavailable: true },
+  { icon: "badge", label: "Team Members", view: "team", superAdminOnly: true },
   { icon: "settings", label: "Settings", unavailable: true },
 ];
 
@@ -121,6 +121,16 @@ const app = createApp({
   data() {
     return {
       accounts: [],
+      adminUsers: [],
+      adminUsersLoading: false,
+      adminUserSaving: false,
+      adminUserMessage: "",
+      adminUserError: "",
+      adminUserForm: {
+        username: "",
+        display_name: "",
+        password: "",
+      },
       activeAccountId: ALL_ACCOUNTS_ID,
       activeChatId: null,
       chats: [],
@@ -297,6 +307,9 @@ const app = createApp({
     adminRoleLabel() {
       return this.currentUser?.role || "Admin Account";
     },
+    isSuperAdmin() {
+      return Boolean(this.currentUser?.is_super_admin);
+    },
     adminInitials() {
       const name = this.adminDisplayName.trim();
       const parts = name.split(/\s+/).filter(Boolean);
@@ -416,6 +429,9 @@ const app = createApp({
     },
     isConversationsView() {
       return this.currentView === "conversations";
+    },
+    isTeamView() {
+      return this.currentView === "team";
     },
     sidebarActualWidth() {
       if (this.sidebarHidden || (this.isMobileLayout && this.activeChatId !== null)) {
@@ -583,13 +599,16 @@ const app = createApp({
     },
     syncViewFromHash() {
       const hash = (window.location.hash || "").replace(/^#\/?/, "");
-      this.currentView = hash === "conversations" ? "conversations" : "accounts";
+      this.currentView = ["accounts", "conversations", "team"].includes(hash) ? hash : "accounts";
       if (this.currentView === "conversations" && this.activeAccountId && !this.chats.length && !this.inboxLoading) {
         this.loadInboxForAccount(this.activeAccountId).catch((error) => console.error(error));
       }
+      if (this.currentView === "team") {
+        this.loadAdminUsers().catch((error) => console.error(error));
+      }
     },
     setView(view) {
-      const normalized = view === "conversations" ? "conversations" : "accounts";
+      const normalized = ["accounts", "conversations", "team"].includes(view) ? view : "accounts";
       this.currentView = normalized;
       window.location.hash = `/${normalized}`;
       if (normalized === "conversations" && this.activeAccountId) {
@@ -598,13 +617,18 @@ const app = createApp({
         this.chats = [];
         this.messages = [];
         this.activeChatId = null;
+      } else if (normalized === "team") {
+        this.loadAdminUsers().catch((error) => console.error(error));
       }
     },
     isSidebarItemActive(item) {
       return Boolean(item.view) && item.view === this.currentView;
     },
+    sidebarItemUnavailable(item) {
+      return Boolean(item.unavailable || (item.superAdminOnly && this.currentUser && !this.isSuperAdmin));
+    },
     sidebarItemClass(item) {
-      if (item.unavailable) {
+      if (this.sidebarItemUnavailable(item)) {
         return "text-secondary-fixed-dim/45 cursor-not-allowed opacity-70";
       }
       return this.isSidebarItemActive(item)
@@ -612,8 +636,8 @@ const app = createApp({
         : "text-secondary-fixed-dim hover:text-white hover:bg-on-secondary-fixed-variant cursor-pointer";
     },
     handleSidebarItemClick(item) {
-      if (item.unavailable) {
-        this.showActionNotice(`${item.label} is not available yet`);
+      if (this.sidebarItemUnavailable(item)) {
+        this.showActionNotice(item.superAdminOnly ? "Super admin only" : `${item.label} is not available yet`);
         return;
       }
       if (item.view) {
@@ -796,9 +820,80 @@ const app = createApp({
     async loadCurrentUser() {
       try {
         this.currentUser = await this.apiRequest("/api/auth/me");
+        if (this.currentView === "team") {
+          this.loadAdminUsers().catch((error) => console.error(error));
+        }
       } catch (error) {
         this.currentUser = null;
         throw error;
+      }
+    },
+    resetAdminUserForm() {
+      this.adminUserForm = {
+        username: "",
+        display_name: "",
+        password: "",
+      };
+    },
+    async loadAdminUsers() {
+      if (!this.currentUser || !this.isSuperAdmin) {
+        return;
+      }
+      this.adminUsersLoading = true;
+      this.adminUserError = "";
+      try {
+        this.adminUsers = await this.apiRequest("/api/admin/users");
+      } catch (error) {
+        this.adminUserError = error.message || "Could not load admin users";
+      } finally {
+        this.adminUsersLoading = false;
+      }
+    },
+    async createAdminUser() {
+      if (!this.isSuperAdmin) {
+        this.adminUserError = "Super admin permission required";
+        return;
+      }
+      this.adminUserSaving = true;
+      this.adminUserError = "";
+      this.adminUserMessage = "";
+      try {
+        const payload = {
+          username: this.adminUserForm.username.trim(),
+          display_name: this.adminUserForm.display_name.trim(),
+          password: this.adminUserForm.password,
+        };
+        if (!payload.username || !payload.display_name || !payload.password) {
+          throw new Error("Please fill username, display name, and password");
+        }
+        await this.apiRequest("/api/admin/users", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        this.adminUserMessage = `Created admin ${payload.username}`;
+        this.resetAdminUserForm();
+        await this.loadAdminUsers();
+      } catch (error) {
+        this.adminUserError = error.message || "Could not create admin";
+      } finally {
+        this.adminUserSaving = false;
+      }
+    },
+    async toggleAdminUserActive(user) {
+      if (!user || user.is_super_admin) {
+        return;
+      }
+      this.adminUserError = "";
+      this.adminUserMessage = "";
+      try {
+        const updated = await this.apiRequest(`/api/admin/users/${user.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ is_active: !user.is_active }),
+        });
+        this.adminUserMessage = `${updated.username} is now ${updated.is_active ? "active" : "disabled"}`;
+        await this.loadAdminUsers();
+      } catch (error) {
+        this.adminUserError = error.message || "Could not update admin";
       }
     },
     async apiFormRequest(url, formData, options = {}) {

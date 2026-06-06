@@ -8,9 +8,11 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Cookie, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 
-from ..db import DATA_DIR, DB_PATH, get_connection, init_db
+from ..db import DATA_DIR, DB_PATH, add_user, get_connection, init_db, list_users, set_user_active
+from .auth import SESSION_COOKIE_NAME, get_current_user
 from ..telegram_gateway import build_session_path
 
 logger = logging.getLogger("omnidesk.admin")
@@ -18,6 +20,25 @@ logger = logging.getLogger("omnidesk.admin")
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 EXPECTED_TABLES = {"accounts", "chats", "messages"}
+
+
+class AdminUserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=8, max_length=256)
+
+
+class AdminUserStatusUpdate(BaseModel):
+    is_active: bool
+
+
+def require_super_admin(omnidesk_session: str | None = Cookie(None, alias=SESSION_COOKIE_NAME)) -> dict:
+    user = get_current_user(omnidesk_session)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not user.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin permission required")
+    return user
 
 
 def _utc_stamp() -> str:
@@ -133,6 +154,7 @@ async def _save_upload(upload: UploadFile, destination: Path) -> None:
 async def api_restore_sqlite(
     db_file: UploadFile = File(...),
     session_file: UploadFile | None = File(None),
+    _super_admin: dict = Depends(require_super_admin),
 ) -> dict:
     """Restore an OmniDesk SQLite database onto the persistent data disk."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -183,3 +205,42 @@ async def api_restore_sqlite(
             shutil.rmtree(temp_dir, ignore_errors=True)
         except Exception:
             logger.debug("Failed to clean restore temp dir %s", temp_dir, exc_info=True)
+
+
+@router.get("/users")
+def api_list_admin_users(_super_admin: dict = Depends(require_super_admin)) -> list[dict]:
+    return list_users()
+
+
+@router.post("/users")
+def api_create_admin_user(
+    payload: AdminUserCreate,
+    _super_admin: dict = Depends(require_super_admin),
+) -> dict:
+    username = payload.username.strip()
+    display_name = payload.display_name.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    if not display_name:
+        raise HTTPException(status_code=400, detail="Display name is required")
+    if any(char.isspace() for char in username):
+        raise HTTPException(status_code=400, detail="Username cannot contain spaces")
+    try:
+        return add_user(username=username, display_name=display_name, password=payload.password, role="Admin")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.patch("/users/{user_id}")
+def api_update_admin_user_status(
+    user_id: int,
+    payload: AdminUserStatusUpdate,
+    _super_admin: dict = Depends(require_super_admin),
+) -> dict:
+    try:
+        user = set_user_active(user_id, payload.is_active)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 import os
+import secrets
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -25,6 +27,25 @@ DB_PATH = DATA_DIR / "app.db"
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    iterations = 240_000
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations).hex()
+    return f"pbkdf2_sha256${iterations}${salt}${digest}"
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        algorithm, raw_iterations, salt, expected = password_hash.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        iterations = int(raw_iterations)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations).hex()
+        return secrets.compare_digest(digest, expected)
+    except Exception:
+        return False
 
 
 def get_connection() -> sqlite3.Connection:
@@ -93,6 +114,18 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE,
                 FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'Admin',
+                is_super_admin INTEGER NOT NULL DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """
         )
@@ -166,7 +199,39 @@ def init_db() -> None:
             WHERE platform IS NULL OR platform = ''
             """
         )
+        _ensure_super_admin_user(conn)
         conn.commit()
+
+
+def _ensure_super_admin_user(conn: sqlite3.Connection) -> None:
+    username = os.environ.get("ADMIN_USERNAME", "Admin")
+    password = os.environ.get("ADMIN_PASSWORD", "123456")
+    display_name = os.environ.get("ADMIN_DISPLAY_NAME", username)
+    now = utc_now()
+    password_hash = hash_password(password)
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        conn.execute(
+            """
+            UPDATE users
+            SET display_name = ?, password_hash = ?, role = 'Super Admin',
+                is_super_admin = 1, is_active = 1, updated_at = ?
+            WHERE id = ?
+            """,
+            (display_name, password_hash, now, existing["id"]),
+        )
+        return
+
+    conn.execute(
+        """
+        INSERT INTO users (
+            username, display_name, password_hash, role,
+            is_super_admin, is_active, created_at, updated_at
+        )
+        VALUES (?, ?, ?, 'Super Admin', 1, 1, ?, ?)
+        """,
+        (username, display_name, password_hash, now, now),
+    )
 
 
 def seed_demo_data() -> None:
@@ -314,6 +379,85 @@ def list_accounts() -> list[dict[str, Any]]:
             """
         ).fetchall()
     return rows_to_dicts(rows)
+
+
+def user_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    user = dict(row)
+    user.pop("password_hash", None)
+    user["is_super_admin"] = bool(user.get("is_super_admin"))
+    user["is_active"] = bool(user.get("is_active"))
+    return user
+
+
+def get_user_by_username(username: str) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE lower(username) = lower(?)
+            """,
+            (username,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_user(user_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return user_row_to_dict(row) if row else None
+
+
+def list_users() -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM users
+            ORDER BY is_super_admin DESC, id ASC
+            """
+        ).fetchall()
+    return [user_row_to_dict(row) for row in rows]
+
+
+def add_user(username: str, display_name: str, password: str, role: str = "Admin") -> dict[str, Any]:
+    now = utc_now()
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO users (
+                    username, display_name, password_hash, role,
+                    is_super_admin, is_active, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 0, 1, ?, ?)
+                """,
+                (username, display_name, hash_password(password), role, now, now),
+            )
+            conn.commit()
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+            return user_row_to_dict(row)
+    except sqlite3.IntegrityError as error:
+        raise ValueError("Username already exists") from error
+
+
+def set_user_active(user_id: int, is_active: bool) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT is_super_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            return None
+        if row["is_super_admin"]:
+            raise ValueError("Super admin cannot be disabled")
+        conn.execute(
+            """
+            UPDATE users
+            SET is_active = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (1 if is_active else 0, utc_now(), user_id),
+        )
+        conn.commit()
+    return get_user(user_id)
 
 
 def add_account(display_name: str, phone: str | None = None, platform: str = "telegram") -> dict[str, Any]:
