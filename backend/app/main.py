@@ -21,6 +21,7 @@ PROJECT_DIR = BASE_DIR.parents[1]
 # DATA_DIR: override via environment variable on Render (mount persistent disk at /var/data)
 _data_dir = Path(os.environ.get("DATA_DIR", str(PROJECT_DIR / "data")))
 MEDIA_DIR = _data_dir / "media"
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 ENV_FILE = PROJECT_DIR / ".env"
 
 
