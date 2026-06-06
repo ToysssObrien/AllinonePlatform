@@ -4,6 +4,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from ..db import DATA_DIR, DB_PATH, get_connection, init_db
 from ..telegram_gateway import build_session_path
+
+logger = logging.getLogger("omnidesk.admin")
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -125,9 +128,10 @@ async def api_restore_sqlite(
     """Restore an OmniDesk SQLite database onto the persistent data disk."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory() as temp_dir_raw:
-        temp_dir = Path(temp_dir_raw)
-        uploaded_db = temp_dir / "restore.db"
+    temp_dir_raw = tempfile.mkdtemp(prefix="omnidesk-restore-")
+    temp_dir = Path(temp_dir_raw)
+    try:
+        uploaded_db = temp_dir / "uploaded-restore.db"
         await _save_upload(db_file, uploaded_db)
         uploaded_counts = _validate_sqlite(uploaded_db)
 
@@ -162,3 +166,13 @@ async def api_restore_sqlite(
             "restored_counts": restored_counts,
             "session_uploaded": session_uploaded,
         }
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.exception("Database restore failed")
+        raise HTTPException(status_code=500, detail=f"Database restore failed: {error}") from error
+    finally:
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            logger.debug("Failed to clean restore temp dir %s", temp_dir, exc_info=True)
