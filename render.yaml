@@ -8,10 +8,10 @@ services:
     region: singapore   # closest to SEA, change if needed: oregon, ohio, frankfurt
     plan: starter       # upgrade to standard for more RAM if needed
 
-    buildCommand: pip install -r requirements.txt
+    buildCommand: python3 -m pip install -r requirements.txt
 
     # Render injects $PORT automatically
-    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    startCommand: python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --workers 1
 
     # Health check — Render will restart the service if this fails
     healthCheckPath: /api/health
