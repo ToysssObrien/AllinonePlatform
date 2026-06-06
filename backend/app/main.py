@@ -55,6 +55,7 @@ from .attachment import set_media_dir
 from .routes.auth import is_authenticated, router as auth_router, SESSION_COOKIE_NAME
 from .routes.accounts import configure as configure_accounts
 from .routes.accounts import router as accounts_router
+from .routes.admin import router as admin_router
 from .routes.chats import configure as configure_chats
 from .routes.chats import router as chats_router
 from .routes.messages import configure as configure_messages
@@ -138,6 +139,7 @@ async def auth_middleware(request: Request, call_next):
 
 app.include_router(auth_router)
 app.include_router(ws_router)
+app.include_router(admin_router)
 app.include_router(accounts_router)
 app.include_router(chats_router)
 app.include_router(messages_router)

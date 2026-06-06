@@ -6,6 +6,7 @@ data/
 .env
 logs/
 tmp_video_frames/
+tmp_restore/
 uvicorn-*.log
 uvicorn-*.out.log
 uvicorn-*.err.log

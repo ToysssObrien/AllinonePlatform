@@ -170,6 +170,10 @@ def init_db() -> None:
 
 
 def seed_demo_data() -> None:
+    if os.environ.get("OMNIDESK_SEED_DEMO") != "1":
+        logger.info("Demo seed skipped. Set OMNIDESK_SEED_DEMO=1 to enable sample accounts.")
+        return
+
     with get_connection() as conn:
         count = conn.execute("SELECT COUNT(*) AS c FROM accounts").fetchone()["c"]
         if count:
