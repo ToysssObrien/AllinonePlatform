@@ -71,6 +71,15 @@ def _remove_sqlite_sidecars() -> None:
             sidecar.unlink()
 
 
+def _install_uploaded_database(uploaded_db: Path) -> None:
+    staging_db = DB_PATH.with_name(f"{DB_PATH.name}.restore-staging-{_utc_stamp()}")
+    shutil.copy2(uploaded_db, staging_db)
+    _validate_sqlite(staging_db)
+    _remove_sqlite_sidecars()
+    os.replace(staging_db, DB_PATH)
+    _remove_sqlite_sidecars()
+
+
 def _normalize_restored_database(*, session_uploaded: bool) -> dict[str, int]:
     init_db()
 
@@ -136,9 +145,7 @@ async def api_restore_sqlite(
         uploaded_counts = _validate_sqlite(uploaded_db)
 
         backup_path = _copy_current_database_backup()
-        _remove_sqlite_sidecars()
-        os.replace(uploaded_db, DB_PATH)
-        _remove_sqlite_sidecars()
+        _install_uploaded_database(uploaded_db)
 
         session_uploaded = False
         if session_file is not None and session_file.filename:
