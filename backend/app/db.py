@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -12,10 +13,14 @@ logger = logging.getLogger("omnidesk.db")
 from .telegram_gateway import build_session_path
 
 
+# DATA_DIR can be overridden by the DATA_DIR environment variable.
+# On Render, set DATA_DIR=/var/data (where the persistent disk is mounted).
+# Locally defaults to <project>/data/
 BASE_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR / "data")))
 MEDIA_DIR = DATA_DIR / "media"
 DB_PATH = DATA_DIR / "app.db"
+
 
 
 def utc_now() -> str:

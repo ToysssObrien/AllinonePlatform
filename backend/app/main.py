@@ -9,21 +9,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .db import init_db, list_accounts, seed_demo_data
-from .telegram_gateway import TelegramGateway
-from .facebook_gateway import FacebookGateway
-from .realtime import hub, router as ws_router
-from .attachment import set_media_dir
-from .routes.auth import is_authenticated, router as auth_router, SESSION_COOKIE_NAME
-from .routes.accounts import configure as configure_accounts
-from .routes.accounts import router as accounts_router
-from .routes.chats import configure as configure_chats
-from .routes.chats import router as chats_router
-from .routes.messages import configure as configure_messages
-from .routes.messages import router as messages_router
-from .routes.webhook import configure as configure_webhook
-from .routes.webhook import router as webhook_router
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -33,8 +18,11 @@ logger = logging.getLogger("omnidesk")
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 PROJECT_DIR = BASE_DIR.parents[1]
-MEDIA_DIR = PROJECT_DIR / "data" / "media"
+# DATA_DIR: override via environment variable on Render (mount persistent disk at /var/data)
+_data_dir = Path(os.environ.get("DATA_DIR", str(PROJECT_DIR / "data")))
+MEDIA_DIR = _data_dir / "media"
 ENV_FILE = PROJECT_DIR / ".env"
+
 
 
 def load_environment_file(path: Path = ENV_FILE) -> None:
@@ -50,13 +38,28 @@ def load_environment_file(path: Path = ENV_FILE) -> None:
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip().strip('"').strip("'")
-            if key and key not in os.environ:
+            if key:
                 os.environ[key] = value
     except Exception as error:
         logger.warning("Failed to load .env file at %s: %s", path, error)
 
 
 load_environment_file()
+
+from .db import init_db, list_accounts, seed_demo_data
+from .telegram_gateway import TelegramGateway
+from .facebook_gateway import FacebookGateway
+from .realtime import hub, router as ws_router
+from .attachment import set_media_dir
+from .routes.auth import is_authenticated, router as auth_router, SESSION_COOKIE_NAME
+from .routes.accounts import configure as configure_accounts
+from .routes.accounts import router as accounts_router
+from .routes.chats import configure as configure_chats
+from .routes.chats import router as chats_router
+from .routes.messages import configure as configure_messages
+from .routes.messages import router as messages_router
+from .routes.webhook import configure as configure_webhook
+from .routes.webhook import router as webhook_router
 
 gateway = TelegramGateway()
 gateway.set_event_sink(hub.broadcast)
@@ -69,6 +72,7 @@ PUBLIC_PATHS = {
     "/login",
     "/api/auth/login",
     "/api/health",
+    "/api/accounts/facebook/oauth/callback",
 }
 PUBLIC_PREFIXES = (
     "/static/",
@@ -98,6 +102,17 @@ app = FastAPI(title="OmniDesk", lifespan=lifespan)
 
 
 @app.middleware("http")
+async def ngrok_bypass_middleware(request: Request, call_next):
+    """Add ngrok-skip-browser-warning to all API responses.
+    This allows external services (Facebook webhooks, etc.) to bypass the
+    ngrok interstitial page without needing a special header in the request."""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/") or request.url.path.startswith("/ws/"):
+        response.headers["ngrok-skip-browser-warning"] = "true"
+    return response
+
+
+@app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Redirect unauthenticated users to /login for page requests,
     or return 401 for API requests."""
@@ -117,6 +132,7 @@ async def auth_middleware(request: Request, call_next):
         return RedirectResponse(url="/login", status_code=302)
 
     return await call_next(request)
+
 
 
 app.include_router(auth_router)

@@ -1,0 +1,54 @@
+# render.yaml — Render deployment configuration for OmniDesk
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: omnidesk
+    runtime: python
+    region: singapore   # closest to SEA, change if needed: oregon, ohio, frankfurt
+    plan: starter       # upgrade to standard for more RAM if needed
+
+    buildCommand: pip install -r requirements.txt
+
+    # Render injects $PORT automatically
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --workers 1
+
+    # Health check — Render will restart the service if this fails
+    healthCheckPath: /api/health
+
+    # Persistent disk — ALL data that must survive redeployments goes here.
+    # Telegram sessions, SQLite DB, and media files are stored on this disk.
+    disk:
+      name: omnidesk-data
+      mountPath: /var/data
+      sizeGB: 5   # increase if you expect large media volume
+
+    envVars:
+      # ─── Data storage ─────────────────────────────────────────────────────
+      - key: DATA_DIR
+        value: /var/data   # must match disk mountPath above
+
+      # ─── Admin credentials (CHANGE THESE!) ────────────────────────────────
+      - key: ADMIN_USERNAME
+        sync: false        # set manually in Render dashboard
+      - key: ADMIN_PASSWORD
+        sync: false        # set manually in Render dashboard
+      - key: ADMIN_DISPLAY_NAME
+        sync: false        # optional, defaults to ADMIN_USERNAME
+
+      # ─── Facebook Integration ──────────────────────────────────────────────
+      - key: FB_APP_ID
+        sync: false
+      - key: FB_APP_SECRET
+        sync: false
+      - key: FB_VERIFY_TOKEN
+        sync: false
+
+      # ─── App URLs (set to your Render URL after first deploy) ─────────────
+      # Example: https://omnidesk.onrender.com
+      - key: OMNIDESK_BASE_URL
+        sync: false
+      - key: OMNIDESK_OAUTH_BASE_URL
+        sync: false
+      - key: OMNIDESK_UI_REDIRECT_URL
+        sync: false

@@ -1,11 +1,13 @@
 .venv/
 __pycache__/
 *.pyc
+*.pyo
 data/
 .env
-node_modules/
 logs/
 tmp_video_frames/
 uvicorn-*.log
 uvicorn-*.out.log
 uvicorn-*.err.log
+*.session
+*.session-journal

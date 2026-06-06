@@ -2377,9 +2377,16 @@ const app = createApp({
           return;
         }
         // Redirect to OAuth start endpoint
-        window.location.href = "/api/accounts/facebook/oauth/start";
+        window.location.href = `/api/accounts/facebook/oauth/start?t=${Date.now()}`;
       } catch (error) {
-        this.fbOAuthError = error.message;
+        if (error.message === "Not authenticated") {
+          this.fbOAuthError = "Session expired. Please log in to OmniDesk again, then connect Facebook.";
+          setTimeout(() => {
+            window.location.href = "/login#/accounts";
+          }, 1200);
+        } else {
+          this.fbOAuthError = error.message;
+        }
         this.fbOAuthLoading = false;
       }
     },

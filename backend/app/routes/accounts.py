@@ -30,8 +30,8 @@ from .. import facebook_oauth
 
 logger = logging.getLogger("omnidesk.accounts")
 
-# Temporary storage for OAuth state tokens (in production, use Redis or DB)
-_oauth_states: dict[str, float] = {}
+# Temporary storage for OAuth state tokens (in production, use Redis or DB).
+_oauth_states: dict[str, dict] = {}
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -75,6 +75,214 @@ def api_create_account(payload: AccountCreate) -> dict:
         )
     return account
 
+
+# ------------------------------------------------------------------
+# Facebook OAuth endpoints (MUST be defined before /{account_id} to
+# avoid FastAPI matching 'facebook' as an account_id parameter)
+# ------------------------------------------------------------------
+
+@router.get("/facebook/oauth/check")
+def api_facebook_oauth_check() -> dict:
+    """Check if Facebook OAuth is configured (FB_APP_ID & FB_APP_SECRET set)."""
+    return {"configured": facebook_oauth.is_configured()}
+
+
+@router.get("/facebook/oauth/start")
+def api_facebook_oauth_start(request: Request) -> "RedirectResponse":
+    """Start Facebook OAuth flow — redirect user to Facebook Login."""
+    from fastapi.responses import RedirectResponse
+    import os
+    import time
+
+    if not facebook_oauth.is_configured():
+        raise HTTPException(status_code=400, detail="Facebook OAuth is not configured. Set FB_APP_ID and FB_APP_SECRET.")
+
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8000"))
+    ui_base_url = f"{scheme}://{host}"
+
+    # OAuth callback is a browser redirect, so localhost works better for local
+    # development than ngrok App Domains. Webhooks continue to use ngrok.
+    oauth_base_url = (
+        os.environ.get("OMNIDESK_OAUTH_BASE_URL")
+        or os.environ.get("OMNIDESK_BASE_URL")
+        or ui_base_url
+    ).rstrip("/")
+    redirect_uri = f"{oauth_base_url}/api/accounts/facebook/oauth/callback"
+
+    state = facebook_oauth.generate_state_token()
+    _oauth_states[state] = {
+        "created_at": time.time(),
+        "ui_base_url": ui_base_url,
+        "oauth_base_url": oauth_base_url,
+    }
+
+    # Clean old states (> 10 min)
+    cutoff = time.time() - 600
+    for key in list(_oauth_states):
+        if _oauth_states[key].get("created_at", 0) < cutoff:
+            del _oauth_states[key]
+
+    login_url = facebook_oauth.get_login_url(redirect_uri, state)
+    response = RedirectResponse(url=login_url, status_code=302)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.get("/facebook/oauth/callback")
+async def api_facebook_oauth_callback(
+    code: str = "",
+    state: str = "",
+    error: str = "",
+    error_code: str = "",
+    error_message: str = "",
+    error_reason: str = "",
+) -> "RedirectResponse":
+    """Handle Facebook OAuth callback — exchange code for token and redirect to UI."""
+    from fastapi.responses import RedirectResponse
+    from urllib.parse import urlencode
+    import time
+    import os
+
+    state_record = _oauth_states.get(state) if state else None
+    ui_base_url = (
+        (state_record or {}).get("ui_base_url")
+        or os.environ.get("OMNIDESK_UI_REDIRECT_URL", "")
+    ).rstrip("/")
+
+    def redirect_to_ui(params: dict[str, str]) -> RedirectResponse:
+        query = urlencode(params)
+        target = f"/?{query}#/accounts"
+        if ui_base_url:
+            target = f"{ui_base_url}/?{query}#/accounts"
+        return RedirectResponse(url=target, status_code=302)
+
+    # Handle any error from Facebook (error, error_code, or error_message)
+    if error or error_code or error_message:
+        if state in _oauth_states:
+            del _oauth_states[state]
+        # Build a descriptive error message
+        fb_error = error or error_reason or "oauth_error"
+        fb_detail = error_message or (f"error_code={error_code}" if error_code else "")
+        logger.warning(
+            "Facebook OAuth error: error=%s error_code=%s error_message=%s",
+            error, error_code, error_message,
+        )
+        error_param = f"{fb_error}: {fb_detail}" if fb_detail else fb_error
+        return redirect_to_ui({"fb_oauth_error": error_param[:300]})
+
+    if not code:
+        return redirect_to_ui({"fb_oauth_error": "no_code"})
+
+    # Validate state token
+    if not state_record:
+        return redirect_to_ui({"fb_oauth_error": "invalid_state"})
+    del _oauth_states[state]
+
+    try:
+        # Reconstruct redirect_uri (must match the one used in /start)
+        oauth_base_url = (
+            state_record.get("oauth_base_url")
+            or os.environ.get("OMNIDESK_OAUTH_BASE_URL")
+            or os.environ.get("OMNIDESK_BASE_URL")
+            or "http://localhost:8000"
+        ).rstrip("/")
+        redirect_uri = f"{oauth_base_url}/api/accounts/facebook/oauth/callback"
+
+        # Exchange code for short-lived token
+        token_data = await facebook_oauth.exchange_code_for_token(code, redirect_uri)
+        short_token = token_data["access_token"]
+
+        # Get long-lived token
+        long_lived_data = await facebook_oauth.get_long_lived_token(short_token)
+        user_token = long_lived_data["access_token"]
+
+        # Redirect back to UI with token (params before hash for JS access)
+        return redirect_to_ui({"fb_user_token": user_token})
+
+    except Exception as e:
+        logger.error("Facebook OAuth callback error: %s", e, exc_info=True)
+        return redirect_to_ui({"fb_oauth_error": str(e)[:200]})
+
+
+@router.get("/facebook/pages")
+async def api_facebook_list_pages(fb_user_token: str = "") -> dict:
+    """List all Facebook Pages managed by the authenticated user."""
+    if not fb_user_token:
+        raise HTTPException(status_code=400, detail="fb_user_token is required")
+
+    try:
+        pages = await facebook_oauth.list_managed_pages(fb_user_token)
+        user_info = await facebook_oauth.get_user_info(fb_user_token)
+        return {
+            "pages": pages,
+            "user": user_info,
+        }
+    except Exception as e:
+        logger.error("Failed to list Facebook pages: %s", e, exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/facebook/connect-page")
+async def api_facebook_connect_page(payload: FacebookConnectPagePayload) -> dict:
+    """Connect a Facebook Page by selecting it from the OAuth page list.
+    Creates a new account or updates an existing one."""
+    if not payload.fb_user_token or not payload.page_id:
+        raise HTTPException(status_code=400, detail="fb_user_token and page_id are required")
+
+    try:
+        # Get all managed pages to find the selected one
+        pages = await facebook_oauth.list_managed_pages(payload.fb_user_token)
+        selected_page = None
+        for page in pages:
+            if str(page["id"]) == str(payload.page_id):
+                selected_page = page
+                break
+
+        if not selected_page:
+            raise HTTPException(status_code=404, detail="Page not found. Make sure you have admin access to this page.")
+
+        page_access_token = selected_page["access_token"]
+        page_name = payload.page_name or selected_page.get("name", f"Page {payload.page_id}")
+
+        # Check if an account for this page already exists
+        existing = get_account_by_page_id(payload.page_id)
+        if existing:
+            # Update existing account with fresh token
+            updated = update_account_profile(
+                existing["id"],
+                display_name=page_name,
+                page_access_token=page_access_token,
+                page_id=payload.page_id,
+            )
+            update_account_login_state(existing["id"], status="authorized", clear_error=True)
+            return {"status": "updated", "account": updated, "page_id": payload.page_id}
+
+        # Create new account
+        account = add_account(page_name, phone=None, platform="facebook_page")
+        updated = update_account_profile(
+            account["id"],
+            page_access_token=page_access_token,
+            page_id=payload.page_id,
+        )
+        update_account_login_state(account["id"], status="authorized", clear_error=True)
+
+        if _broadcast:
+            await _broadcast({"type": "account:created", "account": updated})
+
+        return {"status": "created", "account": updated, "page_id": payload.page_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Facebook connect page error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ------------------------------------------------------------------
+# Per-account endpoints (dynamic /{account_id} routes MUST come AFTER
+# all static /facebook/... routes above)
+# ------------------------------------------------------------------
 
 @router.get("/{account_id}")
 def api_account(account_id: int) -> dict:
@@ -381,158 +589,3 @@ async def api_facebook_sync(account_id: int) -> dict:
 
     task = asyncio.create_task(run_fb_sync())
     return {"status": "queued", "task": task.get_name()}
-
-
-# ------------------------------------------------------------------
-# Facebook OAuth endpoints
-# ------------------------------------------------------------------
-
-@router.get("/facebook/oauth/check")
-def api_facebook_oauth_check() -> dict:
-    """Check if Facebook OAuth is configured (FB_APP_ID & FB_APP_SECRET set)."""
-    return {"configured": facebook_oauth.is_configured()}
-
-
-@router.get("/facebook/oauth/start")
-def api_facebook_oauth_start(request: "Request") -> "RedirectResponse":
-    """Start Facebook OAuth flow — redirect user to Facebook Login."""
-    from fastapi.responses import RedirectResponse
-    from starlette.requests import Request as StarletteRequest
-
-    if not facebook_oauth.is_configured():
-        raise HTTPException(status_code=400, detail="Facebook OAuth is not configured. Set FB_APP_ID and FB_APP_SECRET.")
-
-    # Build redirect URI from the current request
-    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
-    host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8000"))
-    redirect_uri = f"{scheme}://{host}/api/accounts/facebook/oauth/callback"
-
-    state = facebook_oauth.generate_state_token()
-    import time
-    _oauth_states[state] = time.time()
-
-    # Clean old states (> 10 min)
-    cutoff = time.time() - 600
-    for key in list(_oauth_states):
-        if _oauth_states[key] < cutoff:
-            del _oauth_states[key]
-
-    login_url = facebook_oauth.get_login_url(redirect_uri, state)
-    return RedirectResponse(url=login_url, status_code=302)
-
-
-@router.get("/facebook/oauth/callback")
-async def api_facebook_oauth_callback(code: str = "", state: str = "", error: str = "") -> "RedirectResponse":
-    """Handle Facebook OAuth callback — exchange code for token and redirect to UI."""
-    from fastapi.responses import RedirectResponse
-    from urllib.parse import urlencode
-    import time
-
-    if error:
-        params = urlencode({"fb_oauth_error": error})
-        return RedirectResponse(url=f"/?{params}#/accounts", status_code=302)
-
-    if not code:
-        return RedirectResponse(url="/?fb_oauth_error=no_code#/accounts", status_code=302)
-
-    # Validate state token
-    if state not in _oauth_states:
-        return RedirectResponse(url="/?fb_oauth_error=invalid_state#/accounts", status_code=302)
-    del _oauth_states[state]
-
-    try:
-        # Reconstruct redirect_uri (must match the one used in /start)
-        import os
-        base_url = os.environ.get("OMNIDESK_BASE_URL", "http://localhost:8000")
-        redirect_uri = f"{base_url}/api/accounts/facebook/oauth/callback"
-
-        # Exchange code for short-lived token
-        token_data = await facebook_oauth.exchange_code_for_token(code, redirect_uri)
-        short_token = token_data["access_token"]
-
-        # Get long-lived token
-        long_lived_data = await facebook_oauth.get_long_lived_token(short_token)
-        user_token = long_lived_data["access_token"]
-
-        # Redirect back to UI with token (params before hash for JS access)
-        params = urlencode({"fb_user_token": user_token})
-        return RedirectResponse(url=f"/?{params}#/accounts", status_code=302)
-
-    except Exception as e:
-        logger.error("Facebook OAuth callback error: %s", e, exc_info=True)
-        params = urlencode({"fb_oauth_error": str(e)[:200]})
-        return RedirectResponse(url=f"/?{params}#/accounts", status_code=302)
-
-
-@router.get("/facebook/pages")
-async def api_facebook_list_pages(fb_user_token: str = "") -> dict:
-    """List all Facebook Pages managed by the authenticated user."""
-    if not fb_user_token:
-        raise HTTPException(status_code=400, detail="fb_user_token is required")
-
-    try:
-        pages = await facebook_oauth.list_managed_pages(fb_user_token)
-        user_info = await facebook_oauth.get_user_info(fb_user_token)
-        return {
-            "pages": pages,
-            "user": user_info,
-        }
-    except Exception as e:
-        logger.error("Failed to list Facebook pages: %s", e, exc_info=True)
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-
-@router.post("/facebook/connect-page")
-async def api_facebook_connect_page(payload: FacebookConnectPagePayload) -> dict:
-    """Connect a Facebook Page by selecting it from the OAuth page list.
-    Creates a new account or updates an existing one."""
-    if not payload.fb_user_token or not payload.page_id:
-        raise HTTPException(status_code=400, detail="fb_user_token and page_id are required")
-
-    try:
-        # Get all managed pages to find the selected one
-        pages = await facebook_oauth.list_managed_pages(payload.fb_user_token)
-        selected_page = None
-        for page in pages:
-            if str(page["id"]) == str(payload.page_id):
-                selected_page = page
-                break
-
-        if not selected_page:
-            raise HTTPException(status_code=404, detail="Page not found. Make sure you have admin access to this page.")
-
-        page_access_token = selected_page["access_token"]
-        page_name = payload.page_name or selected_page.get("name", f"Page {payload.page_id}")
-
-        # Check if an account for this page already exists
-        existing = get_account_by_page_id(payload.page_id)
-        if existing:
-            # Update existing account with fresh token
-            updated = update_account_profile(
-                existing["id"],
-                display_name=page_name,
-                page_access_token=page_access_token,
-                page_id=payload.page_id,
-            )
-            update_account_login_state(existing["id"], status="authorized", clear_error=True)
-            return {"status": "updated", "account": updated, "page_id": payload.page_id}
-
-        # Create new account
-        account = add_account(page_name, phone=None, platform="facebook_page")
-        updated = update_account_profile(
-            account["id"],
-            page_access_token=page_access_token,
-            page_id=payload.page_id,
-        )
-        update_account_login_state(account["id"], status="authorized", clear_error=True)
-
-        if _broadcast:
-            await _broadcast({"type": "account:created", "account": updated})
-
-        return {"status": "created", "account": updated, "page_id": payload.page_id}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Facebook connect page error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) from e

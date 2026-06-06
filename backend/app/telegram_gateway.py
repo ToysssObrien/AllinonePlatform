@@ -998,6 +998,16 @@ class TelegramGateway:
 
 
 def build_session_path(account_id: int) -> str:
-    base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "sessions"))
+    """Build the file path for a Telegram session file.
+
+    Uses DATA_DIR env var when set (e.g. Render persistent disk at /var/data),
+    otherwise falls back to the project-relative data/sessions/ directory.
+    """
+    data_dir = os.environ.get("DATA_DIR")
+    if data_dir:
+        base = os.path.join(data_dir, "sessions")
+    else:
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "sessions"))
     os.makedirs(base, exist_ok=True)
     return os.path.join(base, f"account-{account_id}")
+

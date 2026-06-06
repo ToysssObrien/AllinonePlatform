@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import secrets
 from datetime import datetime, timezone
 
@@ -13,11 +14,14 @@ logger = logging.getLogger("omnidesk.auth")
 
 router = APIRouter(tags=["auth"])
 
-# --- Hardcoded credentials (single admin user) ---
-ADMIN_USERNAME = "Admin"
-ADMIN_DISPLAY_NAME = "Admin"
+# --- Admin credentials from environment variables ---
+# Set ADMIN_USERNAME and ADMIN_PASSWORD in your environment (Render dashboard).
+# Falls back to "Admin" / "123456" for local development only.
+_raw_password = os.environ.get("ADMIN_PASSWORD", "123456")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "Admin")
+ADMIN_DISPLAY_NAME = os.environ.get("ADMIN_DISPLAY_NAME", ADMIN_USERNAME)
 ADMIN_ROLE = "Admin Account"
-ADMIN_PASSWORD_HASH = hashlib.sha256("123456".encode()).hexdigest()
+ADMIN_PASSWORD_HASH = hashlib.sha256(_raw_password.encode()).hexdigest()
 
 # --- In-memory session store ---
 _sessions: dict[str, dict] = {}
